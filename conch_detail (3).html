@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CONCH ViT-B/16 — Detailed Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fafbfc;
+    --surface: #ffffff;
+    --surface2: #f0f2f5;
+    --border: #d0d5dd;
+    --border-light: #e4e7ec;
+    --text: #1a1d23;
+    --text-dim: #6b7280;
+    --blue: #2563eb;
+    --blue-bg: rgba(37,99,235,0.06);
+    --blue-border: rgba(37,99,235,0.2);
+    --purple: #7c3aed;
+    --purple-bg: rgba(124,58,237,0.06);
+    --purple-border: rgba(124,58,237,0.2);
+    --teal: #0891b2;
+    --teal-bg: rgba(8,145,178,0.06);
+    --teal-border: rgba(8,145,178,0.2);
+    --orange: #d97706;
+    --orange-bg: rgba(217,119,6,0.06);
+    --orange-border: rgba(217,119,6,0.2);
+    --green: #059669;
+    --green-bg: rgba(5,150,105,0.06);
+    --green-border: rgba(5,150,105,0.2);
+    --red: #dc2626;
+    --red-bg: rgba(220,38,38,0.06);
+    --rose: #e11d48;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    line-height: 1.55;
+    padding: 32px 20px 80px;
+  }
+
+  .page {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .hdr {
+    text-align: center;
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid var(--border-light);
+  }
+  .hdr-tag {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--blue);
+    background: var(--blue-bg);
+    border: 1px solid var(--blue-border);
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 12px;
+  }
+  .hdr h1 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
+  }
+  .hdr p {
+    color: var(--text-dim);
+    font-size: 0.88rem;
+  }
+  .hdr-specs {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .hdr-spec {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+  .hdr-spec strong { color: var(--text); }
+
+  /* Flow connector between sections */
+  .flow-connector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 0;
+  }
+  .flow-connector .arrow {
+    width: 2px;
+    height: 28px;
+    background: var(--border);
+    position: relative;
+  }
+  .flow-connector .arrow::after {
+    content: '▼';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: var(--border);
+  }
+  .flow-connector .dim-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    background: var(--surface2);
+    padding: 2px 10px;
+    border-radius: 10px;
+    margin-left: 12px;
+    border: 1px solid var(--border-light);
+  }
+
+  /* Section blocks */
+  .section {
+    background: var(--surface);
+    border: 1.5px solid var(--border-light);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 0;
+  }
+  .section-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .section-head .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .section-head h2 {
+    font-size: 0.88rem;
+    font-weight: 600;
+  }
+  .section-head .badge {
+    margin-left: auto;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 6px;
+  }
+  .section-body {
+    padding: 20px;
+  }
+
+  /* Diagram canvas */
+  .diagram {
+    width: 100%;
+    overflow-x: auto;
+  }
+  .diagram svg {
+    display: block;
+    margin: 0 auto;
+  }
+  svg text {
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+
+  /* Info rows */
+  .info-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  @media (max-width: 640px) {
+    .info-row { grid-template-columns: 1fr 1fr; }
+  }
+  .info-cell {
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 10px 14px;
+    border: 1px solid var(--border-light);
+  }
+  .info-cell .lbl {
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-dim);
+  }
+  .info-cell .val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.82rem;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+
+  /* Repeat indicator */
+  .repeat-wrap {
+    border: 2px dashed var(--purple-border);
+    border-radius: 14px;
+    padding: 4px;
+    position: relative;
+    margin-bottom: 0;
+  }
+  .repeat-badge {
+    position: absolute;
+    top: -12px;
+    right: 20px;
+    background: var(--purple);
+    color: white;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 3px 12px;
+    border-radius: 8px;
+    z-index: 2;
+  }
+
+  /* Frozen banner */
+  .frozen-banner {
+    background: linear-gradient(135deg, #eff6ff, #eef2ff);
+    border: 1.5px solid #bfdbfe;
+    border-radius: 10px;
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    font-size: 0.82rem;
+    color: #1e40af;
+  }
+  .frozen-banner .icon { font-size: 1.2rem; }
+
+  /* Note block */
+  .note {
+    background: var(--orange-bg);
+    border: 1px solid var(--orange-border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-top: 16px;
+    font-size: 0.8rem;
+    color: #92400e;
+    line-height: 1.5;
+  }
+  .note strong { color: #78350f; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="hdr">
+    <div class="hdr-tag">Módulo 1 — Patch-Level Encoder</div>
+    <h1>CONCH · ViT-B/16</h1>
+    <p>CONtrastive learning from Captions for Histopathology — Vision Encoder</p>
+    <div class="hdr-specs">
+      <span class="hdr-spec"><strong>90M</strong> params</span>
+      <span class="hdr-spec"><strong>ViT-Base</strong> backbone</span>
+      <span class="hdr-spec"><strong>CoCa</strong> pretrained</span>
+      <span class="hdr-spec"><strong>1.17M</strong> image-caption pairs</span>
+      <span class="hdr-spec">🧊 <strong>Frozen</strong> in SlideChat</span>
+    </div>
+  </div>
+
+  <div class="frozen-banner">
+    <span class="icon">🧊</span>
+    <span>Todos los pesos de este módulo permanecen <strong>congelados</strong> durante las 2 etapas de entrenamiento de SlideChat. Se usan como extractor de features pre-entrenado.</span>
+  </div>
+
+  <!-- ==================== STEP 1: Patch Embedding ==================== -->
+  <div class="section" style="border-color: var(--blue-border);">
+    <div class="section-head">
+      <div class="dot" style="background:var(--blue);"></div>
+      <h2>Patch Embedding — Conv2d Projection</h2>
+      <span class="badge" style="background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border);">Entrada</span>
+    </div>
+    <div class="section-body">
+      <div class="diagram">
+        <svg width="960" height="220" viewBox="0 0 960 220">
+          <!-- Input image -->
+          <rect x="20" y="45" width="110" height="110" rx="6" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="1.5"/>
+          <rect x="28" y="53" width="94" height="94" rx="3" fill="white" stroke="var(--blue)" stroke-width="0.8" opacity="0.5"/>
+          <!-- Grid to show 14x14 patches within -->
+          <g opacity="0.25" stroke="var(--blue)" stroke-width="0.4">
+            <line x1="35" y1="53" x2="35" y2="147"/><line x1="42" y1="53" x2="42" y2="147"/>
+            <line x1="49" y1="53" x2="49" y2="147"/><line x1="56" y1="53" x2="56" y2="147"/>
+            <line x1="63" y1="53" x2="63" y2="147"/><line x1="70" y1="53" x2="70" y2="147"/>
+            <line x1="77" y1="53" x2="77" y2="147"/><line x1="84" y1="53" x2="84" y2="147"/>
+            <line x1="91" y1="53" x2="91" y2="147"/><line x1="98" y1="53" x2="98" y2="147"/>
+            <line x1="105" y1="53" x2="105" y2="147"/><line x1="112" y1="53" x2="112" y2="147"/>
+            <line x1="28" y1="60" x2="122" y2="60"/><line x1="28" y1="67" x2="122" y2="67"/>
+            <line x1="28" y1="74" x2="122" y2="74"/><line x1="28" y1="81" x2="122" y2="81"/>
+            <line x1="28" y1="88" x2="122" y2="88"/><line x1="28" y1="95" x2="122" y2="95"/>
+            <line x1="28" y1="102" x2="122" y2="102"/><line x1="28" y1="109" x2="122" y2="109"/>
+            <line x1="28" y1="116" x2="122" y2="116"/><line x1="28" y1="123" x2="122" y2="123"/>
+            <line x1="28" y1="130" x2="122" y2="130"/><line x1="28" y1="137" x2="122" y2="137"/>
+          </g>
+          <text x="75" y="35" text-anchor="middle" font-size="11" font-weight="600" fill="var(--blue)">Imagen 224×224×3</text>
+          <text x="75" y="175" text-anchor="middle" font-size="9" class="mono" fill="var(--text-dim)">14×14 grid = 196 patches</text>
+          <text x="75" y="189" text-anchor="middle" font-size="9" class="mono" fill="var(--text-dim)">cada patch: 16×16×3</text>
+
+          <!-- Arrow -->
+          <line x1="140" y1="100" x2="195" y2="100" stroke="var(--blue)" stroke-width="1.5" marker-end="url(#a-blue)"/>
+
+          <!-- Conv2d block -->
+          <rect x="205" y="55" width="160" height="90" rx="8" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="2"/>
+          <text x="285" y="80" text-anchor="middle" font-size="12" font-weight="700" fill="var(--blue)">Conv2d</text>
+          <text x="285" y="97" text-anchor="middle" font-size="9" class="mono" fill="var(--text-dim)">in=3, out=768</text>
+          <text x="285" y="112" text-anchor="middle" font-size="9" class="mono" fill="var(--text-dim)">kernel=16×16, stride=16</text>
+          <text x="285" y="127" text-anchor="middle" font-size="9" class="mono" fill="var(--text-dim)">no overlap → linear proj</text>
+
+          <!-- Arrow -->
+          <line x1="375" y1="100" x2="420" y2="100" stroke="var(--blue)" stroke-width="1.5" marker-end="url(#a-blue)"/>
+          <text x="398" y="90" text-anchor="middle" font-size="8" class="mono" fill="var(--text-dim)">flatten</text>
+
+          <!-- Sequence of tokens -->
+          <rect x="430" y="65" width="115" height="70" rx="6" fill="white" stroke="var(--blue)" stroke-width="1.2"/>
+          <g font-size="8" class="mono" fill="var(--blue)" text-anchor="middle">
+            <rect x="438" y="73" width="42" height="14" rx="3" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="0.6"/>
+            <text x="459" y="83">patch₁</text>
+            <rect x="438" y="91" width="42" height="14" rx="3" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="0.6"/>
+            <text x="459" y="101">patch₂</text>
+            <rect x="438" y="109" width="42" height="14" rx="3" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="0.6"/>
+            <text x="459" y="119">patch₃</text>
+            <text x="500" y="84" fill="var(--text-dim)">⎫</text>
+            <text x="500" y="100" fill="var(--text-dim)">⎬ 768</text>
+            <text x="500" y="116" fill="var(--text-dim)">⎭</text>
+          </g>
+          <text x="488" y="149" text-anchor="middle" font-size="9" class="mono" fill="var(--text-dim)">196 × 768</text>
+
+          <!-- Arrow to prepend CLS -->
+          <line x1="555" y1="100" x2="595" y2="100" stroke="var(--teal)" stroke-width="1.5" marker-end="url(#a-teal)"/>
+          <text x="575" y="90" text-anchor="middle" font-size="8" class="mono" fill="var(--text-dim)">prepend</text>
+
+          <!-- CLS + patches -->
+          <rect x="605" y="55" width="120" height="90" rx="6" fill="white" stroke="var(--teal)" stroke-width="1.2"/>
+          <rect x="613" y="63" width="48" height="14" rx="3" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1"/>
+          <text x="637" y="73" text-anchor="middle" font-size="8" class="mono" font-weight="600" fill="var(--teal)">[CLS]</text>
+          <rect x="613" y="81" width="48" height="14" rx="3" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="0.6"/>
+          <text x="637" y="91" text-anchor="middle" font-size="7" class="mono" fill="var(--blue)">patch₁</text>
+          <rect x="613" y="99" width="48" height="14" rx="3" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="0.6"/>
+          <text x="637" y="109" text-anchor="middle" font-size="7" class="mono" fill="var(--blue)">patch₂</text>
+          <text x="637" y="130" text-anchor="middle" font-size="9" fill="var(--text-dim)">⋮</text>
+          <text x="690" y="85" text-anchor="start" font-size="8" class="mono" fill="var(--text-dim)">1</text>
+          <text x="690" y="100" text-anchor="start" font-size="8" class="mono" fill="var(--text-dim)">196</text>
+          <text x="665" y="159" text-anchor="middle" font-size="9" class="mono" fill="var(--teal)">197 × 768</text>
+
+          <!-- Arrow to pos embed -->
+          <line x1="735" y1="100" x2="770" y2="100" stroke="var(--green)" stroke-width="1.5"/>
+          <!-- Plus circle -->
+          <circle cx="785" cy="100" r="14" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+          <text x="785" y="104" text-anchor="middle" font-size="14" font-weight="700" fill="var(--green)">+</text>
+          <!-- Pos embed label -->
+          <rect x="755" y="48" width="60" height="36" rx="5" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1"/>
+          <text x="785" y="63" text-anchor="middle" font-size="8" font-weight="600" fill="var(--green)">Pos Emb</text>
+          <text x="785" y="76" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">197×768</text>
+          <line x1="785" y1="84" x2="785" y2="86" stroke="var(--green)" stroke-width="1" marker-end="url(#a-green)"/>
+
+          <!-- Arrow out -->
+          <line x1="800" y1="100" x2="840" y2="100" stroke="var(--text-dim)" stroke-width="1.5" marker-end="url(#a-dim)"/>
+
+          <!-- Output -->
+          <rect x="850" y="72" width="95" height="56" rx="8" fill="var(--surface2)" stroke="var(--border)" stroke-width="1.5"/>
+          <text x="898" y="95" text-anchor="middle" font-size="10" font-weight="600" fill="var(--text)">Tokens</text>
+          <text x="898" y="112" text-anchor="middle" font-size="9" class="mono" fill="var(--text-dim)">197 × 768</text>
+
+          <!-- Arrow defs -->
+          <defs>
+            <marker id="a-blue" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--blue)"/></marker>
+            <marker id="a-teal" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--teal)"/></marker>
+            <marker id="a-green" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--green)"/></marker>
+            <marker id="a-purple" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--purple)"/></marker>
+            <marker id="a-orange" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--orange)"/></marker>
+            <marker id="a-dim" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--text-dim)"/></marker>
+            <marker id="a-red" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--red)"/></marker>
+          </defs>
+        </svg>
+      </div>
+      <div class="info-row">
+        <div class="info-cell"><div class="lbl">Input shape</div><div class="val" style="color:var(--blue)">224 × 224 × 3</div></div>
+        <div class="info-cell"><div class="lbl">ViT patch size</div><div class="val" style="color:var(--blue)">16 × 16</div></div>
+        <div class="info-cell"><div class="lbl">Num ViT patches</div><div class="val" style="color:var(--blue)">(224/16)² = 196</div></div>
+        <div class="info-cell"><div class="lbl">Embedding dim</div><div class="val" style="color:var(--blue)">768</div></div>
+        <div class="info-cell"><div class="lbl">+ [CLS] token</div><div class="val" style="color:var(--teal)">1 → total 197</div></div>
+        <div class="info-cell"><div class="lbl">Pos Embeddings</div><div class="val" style="color:var(--green)">Learned absolute</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-connector">
+    <div class="arrow"></div>
+    <span class="dim-label">197 × 768</span>
+  </div>
+
+  <!-- ==================== STEP 2: Transformer Block ==================== -->
+  <div class="repeat-wrap">
+    <div class="repeat-badge">× 12 Transformer Blocks</div>
+    <div class="section" style="border-color: var(--purple-border);">
+      <div class="section-head">
+        <div class="dot" style="background:var(--purple);"></div>
+        <h2>Transformer Encoder Block</h2>
+        <span class="badge" style="background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-border);">Layers = 12</span>
+      </div>
+      <div class="section-body">
+
+        <!-- MHSA sub-section -->
+        <div class="diagram">
+          <svg width="960" height="380" viewBox="0 0 960 380">
+            <!-- ======= TOP HALF: Multi-Head Self-Attention ======= -->
+            <text x="480" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="var(--purple)">Multi-Head Self-Attention (MHSA)</text>
+
+            <!-- Input tokens -->
+            <rect x="15" y="130" width="70" height="45" rx="6" fill="var(--surface2)" stroke="var(--border)" stroke-width="1.2"/>
+            <text x="50" y="149" text-anchor="middle" font-size="9" font-weight="600" fill="var(--text)">Input X</text>
+            <text x="50" y="164" text-anchor="middle" font-size="8" class="mono" fill="var(--text-dim)">197×768</text>
+
+            <!-- Arrow to LN -->
+            <line x1="90" y1="153" x2="118" y2="153" stroke="var(--purple)" stroke-width="1.2" marker-end="url(#a-purple)"/>
+
+            <!-- LayerNorm 1 -->
+            <rect x="125" y="135" width="55" height="36" rx="5" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+            <text x="153" y="150" text-anchor="middle" font-size="9" font-weight="600" fill="var(--purple)">LN</text>
+            <text x="153" y="163" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">ε=1e-6</text>
+
+            <!-- Arrow branches to Q, K, V -->
+            <line x1="185" y1="153" x2="215" y2="153" stroke="var(--purple)" stroke-width="1"/>
+            <!-- Branch point -->
+            <circle cx="220" cy="153" r="3" fill="var(--purple)"/>
+            <line x1="220" y1="153" x2="220" y2="65" stroke="var(--purple)" stroke-width="1"/>
+            <line x1="220" y1="153" x2="220" y2="153" stroke="var(--purple)" stroke-width="1"/>
+            <line x1="220" y1="153" x2="220" y2="241" stroke="var(--purple)" stroke-width="1"/>
+
+            <!-- Q projection -->
+            <line x1="220" y1="65" x2="258" y2="65" stroke="var(--red)" stroke-width="1.2" marker-end="url(#a-red)"/>
+            <rect x="265" y="40" width="88" height="50" rx="6" fill="var(--red-bg)" stroke="var(--red)" stroke-width="1.5"/>
+            <text x="309" y="58" text-anchor="middle" font-size="10" font-weight="700" fill="var(--red)">W_Q</text>
+            <text x="309" y="72" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">768 → 768</text>
+            <text x="309" y="83" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">12h × 64d</text>
+
+            <!-- K projection -->
+            <line x1="220" y1="153" x2="258" y2="153" stroke="#2563eb" stroke-width="1.2" marker-end="url(#a-blue)"/>
+            <rect x="265" y="128" width="88" height="50" rx="6" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="1.5"/>
+            <text x="309" y="146" text-anchor="middle" font-size="10" font-weight="700" fill="var(--blue)">W_K</text>
+            <text x="309" y="160" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">768 → 768</text>
+            <text x="309" y="171" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">12h × 64d</text>
+
+            <!-- V projection -->
+            <line x1="220" y1="241" x2="258" y2="241" stroke="var(--green)" stroke-width="1.2" marker-end="url(#a-green)"/>
+            <rect x="265" y="216" width="88" height="50" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+            <text x="309" y="234" text-anchor="middle" font-size="10" font-weight="700" fill="var(--green)">W_V</text>
+            <text x="309" y="248" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">768 → 768</text>
+            <text x="309" y="259" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">12h × 64d</text>
+
+            <!-- Output labels Q K V -->
+            <line x1="358" y1="65" x2="410" y2="65" stroke="var(--red)" stroke-width="1"/>
+            <text x="384" y="55" text-anchor="middle" font-size="8" class="mono" font-weight="600" fill="var(--red)">Q: 197×768</text>
+            <line x1="358" y1="153" x2="410" y2="153" stroke="var(--blue)" stroke-width="1"/>
+            <text x="384" y="143" text-anchor="middle" font-size="8" class="mono" font-weight="600" fill="var(--blue)">K: 197×768</text>
+            <line x1="358" y1="241" x2="410" y2="241" stroke="var(--green)" stroke-width="1"/>
+            <text x="384" y="271" text-anchor="middle" font-size="8" class="mono" font-weight="600" fill="var(--green)">V: 197×768</text>
+
+            <!-- Reshape into heads -->
+            <text x="430" y="35" text-anchor="middle" font-size="8" class="mono" fill="var(--text-dim)">reshape to 12 heads</text>
+            <line x1="410" y1="65" x2="430" y2="65" stroke="var(--red)" stroke-width="1"/>
+            <line x1="430" y1="65" x2="430" y2="105" stroke="var(--text-dim)" stroke-width="0.8" stroke-dasharray="3,2"/>
+            <line x1="410" y1="153" x2="430" y2="153" stroke="var(--blue)" stroke-width="1"/>
+            <line x1="430" y1="153" x2="430" y2="105" stroke="var(--text-dim)" stroke-width="0.8" stroke-dasharray="3,2"/>
+
+            <!-- QK^T / sqrt(d) -->
+            <rect x="445" y="75" width="115" height="60" rx="8" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+            <text x="503" y="97" text-anchor="middle" font-size="10" font-weight="600" fill="var(--purple)">Q · K^T</text>
+            <text x="503" y="113" text-anchor="middle" font-size="9" class="mono" fill="var(--purple)">/ √64</text>
+            <text x="503" y="127" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">197×197 per head</text>
+
+            <!-- Arrow to softmax -->
+            <line x1="565" y1="105" x2="595" y2="105" stroke="var(--purple)" stroke-width="1.2" marker-end="url(#a-purple)"/>
+
+            <!-- Softmax -->
+            <rect x="600" y="83" width="65" height="44" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+            <text x="633" y="101" text-anchor="middle" font-size="9" font-weight="600" fill="var(--purple)">Softmax</text>
+            <text x="633" y="117" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">dim=-1</text>
+
+            <!-- Arrow -->
+            <line x1="670" y1="105" x2="690" y2="105" stroke="var(--purple)" stroke-width="1"/>
+
+            <!-- Multiply with V -->
+            <!-- V path going up -->
+            <line x1="410" y1="241" x2="700" y2="241" stroke="var(--green)" stroke-width="1"/>
+            <line x1="700" y1="241" x2="700" y2="130" stroke="var(--green)" stroke-width="1" marker-end="url(#a-green)"/>
+
+            <!-- Matmul circle -->
+            <circle cx="700" cy="115" r="14" fill="white" stroke="var(--purple)" stroke-width="1.5"/>
+            <text x="700" y="119" text-anchor="middle" font-size="12" font-weight="700" fill="var(--purple)">×</text>
+
+            <!-- Arrow out of matmul -->
+            <line x1="718" y1="108" x2="748" y2="108" stroke="var(--purple)" stroke-width="1.2" marker-end="url(#a-purple)"/>
+            <text x="733" y="100" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">Attn·V</text>
+
+            <!-- Concat heads -->
+            <rect x="755" y="82" width="72" height="52" rx="6" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+            <text x="791" y="101" text-anchor="middle" font-size="9" font-weight="600" fill="var(--orange)">Concat</text>
+            <text x="791" y="116" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">12×64→768</text>
+            <text x="791" y="127" text-anchor="middle" font-size="7" class="mono" fill="var(--orange)">W_O</text>
+
+            <!-- Arrow to residual -->
+            <line x1="832" y1="108" x2="860" y2="108" stroke="var(--orange)" stroke-width="1.2"/>
+
+            <!-- Residual add -->
+            <circle cx="872" cy="108" r="14" fill="white" stroke="var(--text)" stroke-width="1.5"/>
+            <text x="872" y="112" text-anchor="middle" font-size="14" font-weight="700" fill="var(--text)">+</text>
+            <!-- Skip connection from input -->
+            <path d="M 50 175 L 50 305 L 872 305 L 872 125" stroke="var(--text-dim)" stroke-width="1" fill="none" stroke-dasharray="5,3" marker-end="url(#a-dim)"/>
+            <text x="460" y="318" text-anchor="middle" font-size="8" class="mono" fill="var(--text-dim)">residual connection (skip)</text>
+
+            <!-- Output of MHSA block -->
+            <line x1="872" y1="94" x2="872" y2="60" stroke="var(--text)" stroke-width="1.2"/>
+            <rect x="840" y="33" width="75" height="30" rx="5" fill="var(--surface2)" stroke="var(--border)" stroke-width="1"/>
+            <text x="878" y="52" text-anchor="middle" font-size="8" class="mono" font-weight="600" fill="var(--text)">197×768</text>
+
+            <!-- ======= BOTTOM HALF: FFN ======= -->
+            <text x="480" y="350" text-anchor="middle" font-size="11" font-weight="700" fill="var(--orange)">Feed-Forward Network (FFN)</text>
+            <text x="480" y="370" text-anchor="middle" font-size="9" class="mono" fill="var(--text-dim)">LN → Linear(768→3072) → GELU → Linear(3072→768) → Residual Add</text>
+          </svg>
+        </div>
+
+        <!-- FFN detail diagram -->
+        <div class="diagram" style="margin-top: 8px;">
+          <svg width="960" height="130" viewBox="0 0 960 130">
+            <!-- Input -->
+            <rect x="20" y="38" width="70" height="45" rx="6" fill="var(--surface2)" stroke="var(--border)" stroke-width="1.2"/>
+            <text x="55" y="57" text-anchor="middle" font-size="9" font-weight="600" fill="var(--text)">MHSA out</text>
+            <text x="55" y="72" text-anchor="middle" font-size="8" class="mono" fill="var(--text-dim)">197×768</text>
+
+            <!-- Arrow -->
+            <line x1="95" y1="61" x2="123" y2="61" stroke="var(--orange)" stroke-width="1.2" marker-end="url(#a-orange)"/>
+
+            <!-- LN -->
+            <rect x="130" y="43" width="50" height="36" rx="5" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+            <text x="155" y="58" text-anchor="middle" font-size="9" font-weight="600" fill="var(--orange)">LN</text>
+            <text x="155" y="71" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">ε=1e-6</text>
+
+            <!-- Arrow -->
+            <line x1="185" y1="61" x2="213" y2="61" stroke="var(--orange)" stroke-width="1.2" marker-end="url(#a-orange)"/>
+
+            <!-- Linear up -->
+            <rect x="220" y="35" width="105" height="52" rx="6" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+            <text x="273" y="55" text-anchor="middle" font-size="10" font-weight="600" fill="var(--orange)">Linear ↑</text>
+            <text x="273" y="72" text-anchor="middle" font-size="8" class="mono" fill="var(--text-dim)">768 → 3072</text>
+            <text x="273" y="83" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">(4× expansion)</text>
+
+            <!-- Arrow -->
+            <line x1="330" y1="61" x2="358" y2="61" stroke="var(--orange)" stroke-width="1.2" marker-end="url(#a-orange)"/>
+
+            <!-- GELU -->
+            <rect x="365" y="40" width="65" height="42" rx="6" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+            <text x="398" y="58" text-anchor="middle" font-size="10" font-weight="700" fill="var(--orange)">GELU</text>
+            <text x="398" y="73" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">activation</text>
+
+            <!-- Arrow -->
+            <line x1="435" y1="61" x2="463" y2="61" stroke="var(--orange)" stroke-width="1.2" marker-end="url(#a-orange)"/>
+
+            <!-- Linear down -->
+            <rect x="470" y="35" width="105" height="52" rx="6" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+            <text x="523" y="55" text-anchor="middle" font-size="10" font-weight="600" fill="var(--orange)">Linear ↓</text>
+            <text x="523" y="72" text-anchor="middle" font-size="8" class="mono" fill="var(--text-dim)">3072 → 768</text>
+            <text x="523" y="83" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">(project back)</text>
+
+            <!-- Arrow to residual -->
+            <line x1="580" y1="61" x2="618" y2="61" stroke="var(--orange)" stroke-width="1.2"/>
+
+            <!-- Residual circle -->
+            <circle cx="632" cy="61" r="14" fill="white" stroke="var(--text)" stroke-width="1.5"/>
+            <text x="632" y="65" text-anchor="middle" font-size="14" font-weight="700" fill="var(--text)">+</text>
+
+            <!-- Skip connection -->
+            <path d="M 55 83 L 55 115 L 632 115 L 632 78" stroke="var(--text-dim)" stroke-width="1" fill="none" stroke-dasharray="5,3" marker-end="url(#a-dim)"/>
+            <text x="340" y="125" text-anchor="middle" font-size="8" class="mono" fill="var(--text-dim)">residual connection (skip)</text>
+
+            <!-- Output -->
+            <line x1="650" y1="61" x2="688" y2="61" stroke="var(--text)" stroke-width="1.2" marker-end="url(#a-dim)"/>
+            <rect x="695" y="38" width="85" height="46" rx="6" fill="var(--surface2)" stroke="var(--border)" stroke-width="1.2"/>
+            <text x="738" y="57" text-anchor="middle" font-size="9" font-weight="600" fill="var(--text)">Block out</text>
+            <text x="738" y="72" text-anchor="middle" font-size="8" class="mono" fill="var(--text-dim)">197 × 768</text>
+          </svg>
+        </div>
+
+        <div class="info-row" style="margin-top: 16px;">
+          <div class="info-cell"><div class="lbl">Attention Heads</div><div class="val" style="color:var(--purple)">12</div></div>
+          <div class="info-cell"><div class="lbl">Head Dim (d_k)</div><div class="val" style="color:var(--purple)">768/12 = 64</div></div>
+          <div class="info-cell"><div class="lbl">Attn Matrix</div><div class="val" style="color:var(--purple)">197 × 197</div></div>
+          <div class="info-cell"><div class="lbl">FFN Expansion</div><div class="val" style="color:var(--orange)">768 → 3072 (4×)</div></div>
+          <div class="info-cell"><div class="lbl">Activation</div><div class="val" style="color:var(--orange)">GELU</div></div>
+          <div class="info-cell"><div class="lbl">Norm</div><div class="val" style="color:var(--purple)">Pre-LN (×2)</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-connector">
+    <div class="arrow"></div>
+    <span class="dim-label">197 × 768 (after 12 blocks)</span>
+  </div>
+
+  <!-- ==================== STEP 3: Attentional Pooler + Output ==================== -->
+  <div class="section" style="border-color: var(--teal-border);">
+    <div class="section-head">
+      <div class="dot" style="background:var(--teal);"></div>
+      <h2>Attentional Pooler → Output Embedding</h2>
+      <span class="badge" style="background:var(--teal-bg);color:var(--teal);border:1px solid var(--teal-border);">Salida</span>
+    </div>
+    <div class="section-body">
+      <div class="diagram">
+        <svg width="960" height="160" viewBox="0 0 960 160">
+          <!-- Input from encoder -->
+          <rect x="20" y="48" width="90" height="52" rx="6" fill="var(--surface2)" stroke="var(--border)" stroke-width="1.2"/>
+          <text x="65" y="68" text-anchor="middle" font-size="9" font-weight="600" fill="var(--text)">Encoder out</text>
+          <text x="65" y="85" text-anchor="middle" font-size="8" class="mono" fill="var(--text-dim)">197 × 768</text>
+
+          <!-- Arrow -->
+          <line x1="116" y1="74" x2="148" y2="74" stroke="var(--teal)" stroke-width="1.2" marker-end="url(#a-teal)"/>
+
+          <!-- Attentional pooler -->
+          <rect x="155" y="38" width="140" height="72" rx="8" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="2"/>
+          <text x="225" y="60" text-anchor="middle" font-size="10" font-weight="700" fill="var(--teal)">Attentional Pooler</text>
+          <text x="225" y="76" text-anchor="middle" font-size="8" class="mono" fill="var(--text-dim)">cross-attention con</text>
+          <text x="225" y="90" text-anchor="middle" font-size="8" class="mono" fill="var(--text-dim)">query tokens aprendidos</text>
+          <text x="225" y="103" text-anchor="middle" font-size="7" class="mono" fill="var(--teal)">CoCa-style</text>
+
+          <!-- Arrow out -->
+          <line x1="300" y1="74" x2="340" y2="74" stroke="var(--teal)" stroke-width="1.2" marker-end="url(#a-teal)"/>
+          <text x="320" y="65" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">pool</text>
+
+          <!-- Intermediate -->
+          <rect x="348" y="48" width="90" height="52" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.2"/>
+          <text x="393" y="68" text-anchor="middle" font-size="9" font-weight="600" fill="var(--teal)">Pooled</text>
+          <text x="393" y="85" text-anchor="middle" font-size="8" class="mono" fill="var(--teal)">768-dim</text>
+
+          <!-- Two output paths -->
+          <!-- Path A: proj_contrast=False (for MIL/SlideChat) -->
+          <line x1="443" y1="62" x2="510" y2="42" stroke="var(--green)" stroke-width="1.5" marker-end="url(#a-green)"/>
+          <rect x="518" y="15" width="185" height="56" rx="8" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.8"/>
+          <text x="610" y="35" text-anchor="middle" font-size="9" font-weight="700" fill="var(--green)">proj_contrast = False</text>
+          <text x="610" y="50" text-anchor="middle" font-size="9" class="mono" font-weight="600" fill="var(--green)">→ 512-dim embedding</text>
+          <text x="610" y="64" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">usado en SlideChat / MIL</text>
+
+          <!-- Star to mark this is the one used -->
+          <text x="715" y="45" font-size="14" fill="var(--green)">★</text>
+
+          <!-- Path B: proj_contrast=True (for retrieval) -->
+          <line x1="443" y1="86" x2="510" y2="110" stroke="var(--text-dim)" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a-dim)"/>
+          <rect x="518" y="90" width="185" height="52" rx="8" fill="var(--surface2)" stroke="var(--border)" stroke-width="1"/>
+          <text x="610" y="110" text-anchor="middle" font-size="9" font-weight="600" fill="var(--text-dim)">proj_contrast = True</text>
+          <text x="610" y="125" text-anchor="middle" font-size="9" class="mono" fill="var(--text-dim)">→ 512-dim + L2 norm</text>
+          <text x="610" y="137" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">para image-text retrieval</text>
+
+          <!-- Next module indicator -->
+          <line x1="710" y1="43" x2="790" y2="43" stroke="var(--green)" stroke-width="1.5" marker-end="url(#a-green)"/>
+          <rect x="800" y="18" width="140" height="52" rx="8" fill="white" stroke="var(--purple)" stroke-width="1.5" stroke-dasharray="6,3"/>
+          <text x="870" y="38" text-anchor="middle" font-size="9" font-weight="600" fill="var(--purple)">→ Slide Encoder</text>
+          <text x="870" y="53" text-anchor="middle" font-size="8" class="mono" fill="var(--text-dim)">LongNet (Módulo 2)</text>
+          <text x="870" y="64" text-anchor="middle" font-size="7" class="mono" fill="var(--purple)">N_patches × 512</text>
+        </svg>
+      </div>
+      <div class="info-row">
+        <div class="info-cell"><div class="lbl">Pre-projection dim</div><div class="val" style="color:var(--teal)">768</div></div>
+        <div class="info-cell"><div class="lbl">Output dim (per patch)</div><div class="val" style="color:var(--green)">512</div></div>
+        <div class="info-cell"><div class="lbl">Total output shape</div><div class="val" style="color:var(--green)">N × 512</div></div>
+      </div>
+      <div class="note">
+        <strong>Nota:</strong> Cada parche de 224×224 del WSI pasa independientemente por CONCH, produciendo un vector de 512 dimensiones. Para un WSI completo con N parches, la salida es una secuencia <strong>[N × 512]</strong> que alimenta al Slide-Level Encoder (LongNet). N puede ser del orden de miles a decenas de miles dependiendo del tamaño del slide.
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
