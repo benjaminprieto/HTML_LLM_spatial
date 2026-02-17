@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PPI Structural Analyzer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box;}
+
+:root {
+  --bg-deep: #05080f;
+  --bg-base: #0b1120;
+  --bg-card: #0f172a;
+  --bg-elevated: #141e33;
+  --bg-hover: #1a2744;
+  --border-dim: #1a2744;
+  --border-mid: #253553;
+  --border-bright: #3b5998;
+  --text-bright: #e8edf5;
+  --text-mid: #8899b8;
+  --text-dim: #4a5f85;
+  --protein-a: #00d4aa;
+  --protein-a-dim: #00d4aa40;
+  --protein-b: #c084fc;
+  --protein-b-dim: #c084fc40;
+  --protein-c: #f59e42;
+  --protein-c-dim: #f59e4240;
+  --xlink-sat: #3b82f6;
+  --xlink-viol: #f43f5e;
+  --confidence-high: #22d3ee;
+  --confidence-med: #f59e0b;
+  --confidence-low: #ef4444;
+  --accent: #38bdf8;
+}
+
+body {
+  font-family: 'IBM Plex Sans', sans-serif;
+  background: var(--bg-deep);
+  color: var(--text-bright);
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* ── Layout ── */
+.app {
+  display: grid;
+  grid-template-rows: 48px 1fr;
+  height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border-dim);
+  gap: 16px;
+  z-index: 100;
+}
+
+.topbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.3px;
+  color: var(--text-bright);
+  white-space: nowrap;
+}
+
+.topbar-logo .ico {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: linear-gradient(135deg, var(--protein-a), var(--protein-b));
+  position: relative;
+}
+
+.topbar-logo .ico::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 2px;
+  border: 1.5px solid rgba(255,255,255,0.5);
+}
+
+.topbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border-dim);
+}
+
+.complex-selector {
+  display: flex;
+  gap: 4px;
+}
+
+.complex-btn {
+  padding: 4px 12px;
+  border-radius: 5px;
+  border: 1px solid var(--border-dim);
+  background: transparent;
+  color: var(--text-mid);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.complex-btn:hover { background: var(--bg-hover); color: var(--text-bright); }
+.complex-btn.active {
+  background: var(--protein-a);
+  color: var(--bg-deep);
+  border-color: var(--protein-a);
+  font-weight: 500;
+}
+
+.topbar-meta {
+  margin-left: auto;
+  display: flex;
+  gap: 16px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.topbar-meta span em { color: var(--accent); font-style: normal; }
+
+/* ── Main grid ── */
+.main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 1px;
+  background: var(--border-dim);
+  overflow: hidden;
+}
+
+.panel {
+  background: var(--bg-base);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-dim);
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.panel-title .tag {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.panel-body {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.panel-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.ctrl-btn {
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-dim);
+  background: transparent;
+  color: var(--text-dim);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.ctrl-btn:hover { background: var(--bg-hover); color: var(--text-mid); }
+.ctrl-btn.active { background: var(--accent); color: var(--bg-deep); border-color: var(--accent); }
+
+/* ── Circular crosslink map ── */
+#circular-svg { width: 100%; height: 100%; }
+
+.arc-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  fill: var(--text-bright);
+}
+
+.residue-tick-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 7px;
+  fill: var(--text-dim);
+}
+
+.xlink-line {
+  fill: none;
+  stroke-width: 1.5;
+  opacity: 0.6;
+  transition: opacity 0.2s, stroke-width 0.2s;
+  cursor: pointer;
+}
+
+.xlink-line:hover, .xlink-line.highlighted {
+  opacity: 1;
+  stroke-width: 3;
+}
+
+.xlink-line.dimmed {
+  opacity: 0.06;
+}
+
+.domain-label {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 8px;
+  font-weight: 500;
+  fill: var(--text-mid);
+}
+
+/* ── Contact map (heatmap) ── */
+#contact-svg { width: 100%; height: 100%; }
+
+.contact-cell {
+  transition: opacity 0.15s;
+  cursor: pointer;
+}
+
+.contact-cell:hover {
+  stroke: white;
+  stroke-width: 1;
+}
+
+.axis-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px;
+  fill: var(--text-dim);
+}
+
+.contact-axis-title {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* ── Interface detail ── */
+.interface-panel {
+  padding: 12px 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.interface-panel::-webkit-scrollbar { width: 3px; }
+.interface-panel::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
+
+.if-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.if-stat {
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 10px;
+  border: 1px solid var(--border-dim);
+}
+
+.if-stat-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.if-stat-value {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.if-residue-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.if-residue-table th {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-dim);
+  font-weight: 500;
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-dim);
+  position: sticky;
+  top: 0;
+  background: var(--bg-base);
+}
+
+.if-residue-table td {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border-dim);
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.if-residue-table tr:hover td {
+  background: var(--bg-hover);
+  color: var(--text-bright);
+}
+
+.if-residue-table .res-name { font-weight: 500; }
+
+.bond-type-tag {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.bond-hbond { background: #22d3ee20; color: #22d3ee; }
+.bond-salt { background: #f43f5e20; color: #f43f5e; }
+.bond-hydrophobic { background: #f59e0b20; color: #f59e0b; }
+.bond-vdw { background: #64748b30; color: #94a3b8; }
+.bond-pistack { background: #c084fc20; color: #c084fc; }
+
+/* ── Elution / SEC profile ── */
+#sec-svg { width: 100%; height: 100%; }
+
+.sec-line {
+  fill: none;
+  stroke-width: 2;
+}
+
+.sec-area {
+  opacity: 0.08;
+}
+
+.sec-marker {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  fill: var(--text-dim);
+}
+
+/* ── pLDDT strip ── */
+.plddt-strip {
+  height: 6px;
+  display: flex;
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 8px 16px;
+}
+
+.plddt-segment {
+  height: 100%;
+  transition: flex 0.3s;
+}
+
+/* ── Tooltip ── */
+.tip {
+  position: fixed;
+  pointer-events: none;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 11px;
+  max-width: 240px;
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.1s;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+}
+
+.tip.visible { opacity: 1; }
+.tip-title { font-weight: 600; margin-bottom: 3px; }
+.tip-sub { color: var(--text-dim); font-family: 'IBM Plex Mono', monospace; font-size: 10px; }
+
+/* ── Confidence badge ── */
+.conf-badge {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .main { grid-template-columns: 1fr; grid-template-rows: repeat(4, 1fr); }
+}
+
+/* ── Animations ── */
+@keyframes drawIn {
+  from { stroke-dashoffset: 300; }
+  to { stroke-dashoffset: 0; }
+}
+
+.xlink-line {
+  stroke-dasharray: 300;
+  animation: drawIn 1.2s ease forwards;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-up { animation: fadeUp 0.4s ease forwards; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar-logo">
+      <div class="ico"></div>
+      PPI Analyzer
+    </div>
+    <div class="topbar-divider"></div>
+    <div class="complex-selector">
+      <button class="complex-btn active" onclick="loadComplex(0, this)">NRP1 · XYLT1</button>
+      <button class="complex-btn" onclick="loadComplex(1, this)">NRP1 · VEGFA</button>
+      <button class="complex-btn" onclick="loadComplex(2, this)">NRP1 · SEMA3A</button>
+      <button class="complex-btn" onclick="loadComplex(3, this)">TGFBR2 · SMAD3</button>
+    </div>
+    <div class="topbar-meta">
+      <span>Model <em id="meta-method">AlphaFold3</em></span>
+      <span>ipTM <em id="meta-iptm">0.82</em></span>
+      <span>DockQ <em id="meta-dockq">0.71</em></span>
+      <span>XL satisfied <em id="meta-xl">87%</em></span>
+    </div>
+  </div>
+
+  <!-- Main 2x2 -->
+  <div class="main">
+    <!-- Panel 1: Circular crosslink map -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          Crosslink Map
+          <span class="tag" style="background:var(--xlink-sat);color:var(--bg-deep);">inter</span>
+          <span class="tag" style="background:var(--xlink-viol);color:var(--bg-deep);">intra</span>
+        </div>
+        <div class="panel-controls">
+          <button class="ctrl-btn active" data-filter="all" onclick="filterXlinks('all',this)">All</button>
+          <button class="ctrl-btn" data-filter="inter" onclick="filterXlinks('inter',this)">Inter</button>
+          <button class="ctrl-btn" data-filter="intra" onclick="filterXlinks('intra',this)">Intra</button>
+          <button class="ctrl-btn" data-filter="violated" onclick="filterXlinks('violated',this)">Violated</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <svg id="circular-svg"></svg>
+      </div>
+    </div>
+
+    <!-- Panel 2: Contact map -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          PAE / Contact Map
+          <span class="tag" style="background:var(--confidence-high);color:var(--bg-deep);" id="contact-mode-tag">PAE</span>
+        </div>
+        <div class="panel-controls">
+          <button class="ctrl-btn active" onclick="setContactMode('pae',this)">PAE</button>
+          <button class="ctrl-btn" onclick="setContactMode('contact',this)">Contacts</button>
+          <button class="ctrl-btn" onclick="setContactMode('energy',this)">ΔG</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <svg id="contact-svg"></svg>
+      </div>
+    </div>
+
+    <!-- Panel 3: Interface detail -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Interface Analysis</div>
+        <div class="panel-controls">
+          <button class="ctrl-btn active" onclick="sortInterface('distance',this)">Distance</button>
+          <button class="ctrl-btn" onclick="sortInterface('energy',this)">Energy</button>
+          <button class="ctrl-btn" onclick="sortInterface('sasa',this)">ΔSASA</button>
+        </div>
+      </div>
+      <div class="panel-body interface-panel" id="interface-panel"></div>
+    </div>
+
+    <!-- Panel 4: SEC + pLDDT + binding energy -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Biophysical Validation</div>
+        <div class="panel-controls">
+          <button class="ctrl-btn active" onclick="setSecMode('sec',this)">SEC-MALS</button>
+          <button class="ctrl-btn" onclick="setSecMode('spr',this)">SPR</button>
+          <button class="ctrl-btn" onclick="setSecMode('dsc',this)">DSF</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <svg id="sec-svg"></svg>
+      </div>
+      <div class="plddt-strip" id="plddt-strip" title="Interface pLDDT"></div>
+    </div>
+  </div>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// DATA — Protein complexes with realistic PPI data
+// ═══════════════════════════════════════════════════════════════
+
+const AMINO_ACIDS = ['ALA','ARG','ASN','ASP','CYS','GLN','GLU','GLY','HIS','ILE','LEU','LYS','MET','PHE','PRO','SER','THR','TRP','TYR','VAL'];
+const AA1 = {'ALA':'A','ARG':'R','ASN':'N','ASP':'D','CYS':'C','GLN':'Q','GLU':'E','GLY':'G','HIS':'H','ILE':'I','LEU':'L','LYS':'K','MET':'M','PHE':'F','PRO':'P','SER':'S','THR':'T','TRP':'W','TYR':'Y','VAL':'V'};
+
+const BOND_TYPES = [
+  { type: 'H-bond', cls: 'bond-hbond' },
+  { type: 'Salt bridge', cls: 'bond-salt' },
+  { type: 'Hydrophobic', cls: 'bond-hydrophobic' },
+  { type: 'vdW', cls: 'bond-vdw' },
+  { type: 'π-stack', cls: 'bond-pistack' },
+];
+
+function randAA() { return AMINO_ACIDS[Math.floor(Math.random()*AMINO_ACIDS.length)]; }
+function randBond() { return BOND_TYPES[Math.floor(Math.random()*BOND_TYPES.length)]; }
+
+function generateComplex(config) {
+  const { nameA, nameB, lenA, lenB, domainsA, domainsB, numXlinks, numContacts, iptm, dockq, color_a, color_b } = config;
+  
+  // Generate crosslinks
+  const xlinks = [];
+  for (let i = 0; i < numXlinks; i++) {
+    const resA = Math.floor(Math.random() * lenA) + 1;
+    const resB = Math.floor(Math.random() * lenB) + 1;
+    const isInter = Math.random() < 0.6;
+    const dist = isInter ? 8 + Math.random() * 25 : 5 + Math.random() * 20;
+    const satisfied = dist <= 30;
+    xlinks.push({
+      from: { chain: isInter ? 'A' : (Math.random()<0.5?'A':'B'), res: resA, aa: randAA() },
+      to: { chain: isInter ? 'B' : (Math.random()<0.5?'A':'B'), res: isInter ? resB : Math.floor(Math.random()*lenA)+1, aa: randAA() },
+      type: isInter ? 'inter' : 'intra',
+      distance: dist,
+      satisfied: satisfied,
+    });
+  }
+  // Ensure crosslink chains make sense for intra
+  xlinks.forEach(xl => {
+    if (xl.type === 'intra') xl.to.chain = xl.from.chain;
+  });
+
+  // Generate interface contacts
+  const contacts = [];
+  const hotspotA = lenA * 0.3 + Math.random() * lenA * 0.4;
+  const hotspotB = lenB * 0.3 + Math.random() * lenB * 0.4;
+  for (let i = 0; i < numContacts; i++) {
+    const rA = Math.floor(hotspotA + (Math.random() - 0.5) * lenA * 0.3);
+    const rB = Math.floor(hotspotB + (Math.random() - 0.5) * lenB * 0.3);
+    const bond = randBond();
+    contacts.push({
+      resA: { num: Math.max(1, Math.min(lenA, rA)), aa: randAA() },
+      resB: { num: Math.max(1, Math.min(lenB, rB)), aa: randAA() },
+      distance: 2.5 + Math.random() * 5.5,
+      energy: -(0.5 + Math.random() * 6),
+      sasa: 5 + Math.random() * 45,
+      bondType: bond.type,
+      bondCls: bond.cls,
+    });
+  }
+
+  // PAE matrix (simplified)
+  const paeSize = 40;
+  const binA = lenA / paeSize;
+  const binB = lenB / paeSize;
+  const pae = [];
+  for (let i = 0; i < paeSize * 2; i++) {
+    pae[i] = [];
+    for (let j = 0; j < paeSize * 2; j++) {
+      const sameBlock = (i < paeSize && j < paeSize) || (i >= paeSize && j >= paeSize);
+      const interfaceBlock = (i >= paeSize * 0.2 && i <= paeSize * 0.7 && j >= paeSize * 1.2 && j <= paeSize * 1.7) ||
+                             (j >= paeSize * 0.2 && j <= paeSize * 0.7 && i >= paeSize * 1.2 && i <= paeSize * 1.7);
+      let val;
+      if (sameBlock) {
+        const diag = Math.abs(i - j) / paeSize;
+        val = 2 + diag * 8 + Math.random() * 4;
+      } else if (interfaceBlock) {
+        val = 5 + Math.random() * 10;
+      } else {
+        val = 15 + Math.random() * 15;
+      }
+      pae[i][j] = Math.min(31, Math.max(0, val));
+    }
+  }
+
+  // SEC data
+  const secData = generateSEC(lenA, lenB);
+  // SPR data
+  const sprData = generateSPR();
+  // DSF data
+  const dsfData = generateDSF();
+
+  // pLDDT
+  const plddt = [];
+  for (let i = 0; i < lenA + lenB; i++) {
+    const isInterface = (i > lenA*0.3 && i < lenA*0.6) || (i > lenA + lenB*0.3 && i < lenA + lenB*0.6);
+    plddt.push(isInterface ? 60 + Math.random()*30 : 75 + Math.random()*20);
+  }
+
+  // Summary stats
+  const bsa = 800 + Math.random() * 1200;
+  const dg = -(5 + Math.random() * 15);
+  const xlSat = xlinks.filter(x => x.satisfied).length / xlinks.length * 100;
+
+  return {
+    nameA, nameB, lenA, lenB, domainsA, domainsB,
+    color_a: color_a || 'var(--protein-a)',
+    color_b: color_b || 'var(--protein-b)',
+    xlinks, contacts, pae, plddt,
+    secData, sprData, dsfData,
+    iptm, dockq, xlSat, bsa, dg, numContacts,
+    paeSize
+  };
+}
+
+function generateSEC(lenA, lenB) {
+  const mw = (lenA + lenB) * 110 / 1000;
+  const points = [];
+  for (let x = 0; x <= 50; x++) {
+    const frac = x;
+    // Complex peak
+    const pk1 = 15 + (lenA * 110 + lenB * 110) / 1000 / 10;
+    const a1 = Math.exp(-((frac - pk1) ** 2) / 8) * 0.85;
+    // Monomer A peak
+    const pk2 = pk1 + 8;
+    const a2 = Math.exp(-((frac - pk2) ** 2) / 5) * 0.25;
+    // Monomer B peak
+    const pk3 = pk2 + 4;
+    const a3 = Math.exp(-((frac - pk3) ** 2) / 4) * 0.15;
+    
+    points.push({
+      fraction: frac,
+      absorbance: a1 + a2 + a3 + Math.random() * 0.02,
+      complex: a1,
+      monoA: a2,
+      monoB: a3
+    });
+  }
+  return { points, mw, peakFraction: 15 + (lenA*110+lenB*110)/1000/10 };
+}
+
+function generateSPR() {
+  const points = [];
+  const ka = 1e5 + Math.random() * 9e5;
+  const kd = 1e-3 + Math.random() * 1e-2;
+  const rmax = 80 + Math.random() * 120;
+  // Association phase
+  for (let t = 0; t < 200; t++) {
+    const r = rmax * (1 - Math.exp(-((ka * 1e-7 + kd) * t / 30)));
+    points.push({ time: t, response: r + (Math.random()-0.5)*2 });
+  }
+  // Dissociation phase
+  const rEnd = points[points.length-1].response;
+  for (let t = 200; t < 400; t++) {
+    const r = rEnd * Math.exp(-kd * (t-200) / 5);
+    points.push({ time: t, response: r + (Math.random()-0.5)*2 });
+  }
+  const KD = kd / ka * 1e9;
+  return { points, KD, ka, kd };
+}
+
+function generateDSF() {
+  const points = [];
+  const tm1 = 52 + Math.random() * 15;
+  const tm2 = tm1 + 3 + Math.random() * 8;
+  for (let t = 25; t <= 95; t += 0.5) {
+    const apo = 1 / (1 + Math.exp(-(t - tm1) / 2.5));
+    const complex = 1 / (1 + Math.exp(-(t - tm2) / 2.8));
+    points.push({
+      temp: t,
+      apo: apo + (Math.random()-0.5)*0.02,
+      complex: complex + (Math.random()-0.5)*0.02
+    });
+  }
+  return { points, tm1, tm2, deltaTm: tm2 - tm1 };
+}
+
+const COMPLEXES = [
+  generateComplex({
+    nameA: 'NRP1', nameB: 'XYLT1', lenA: 923, lenB: 801,
+    domainsA: [{name:'a1',s:1,e:148},{name:'a2',s:149,e:275},{name:'b1',s:276,e:428},{name:'b2',s:429,e:586},{name:'MAM',s:587,e:838},{name:'TM+Cyto',s:839,e:923}],
+    domainsB: [{name:'Stem',s:1,e:150},{name:'GT-A',s:151,e:500},{name:'GT-B',s:501,e:750},{name:'C-term',s:751,e:801}],
+    numXlinks: 35, numContacts: 48, iptm: 0.82, dockq: 0.71,
+  }),
+  generateComplex({
+    nameA: 'NRP1', nameB: 'VEGFA', lenA: 923, lenB: 232,
+    domainsA: [{name:'a1',s:1,e:148},{name:'a2',s:149,e:275},{name:'b1',s:276,e:428},{name:'b2',s:429,e:586},{name:'MAM',s:587,e:838},{name:'TM+Cyto',s:839,e:923}],
+    domainsB: [{name:'HBD',s:1,e:110},{name:'CysKnot',s:111,e:232}],
+    numXlinks: 22, numContacts: 36, iptm: 0.91, dockq: 0.85,
+    color_b: 'var(--protein-c)',
+  }),
+  generateComplex({
+    nameA: 'NRP1', nameB: 'SEMA3A', lenA: 923, lenB: 771,
+    domainsA: [{name:'a1',s:1,e:148},{name:'a2',s:149,e:275},{name:'b1',s:276,e:428},{name:'b2',s:429,e:586},{name:'MAM',s:587,e:838},{name:'TM+Cyto',s:839,e:923}],
+    domainsB: [{name:'Sema',s:1,e:510},{name:'PSI',s:511,e:570},{name:'Ig',s:571,e:680},{name:'Basic',s:681,e:771}],
+    numXlinks: 28, numContacts: 42, iptm: 0.88, dockq: 0.78,
+    color_b: '#f97316',
+  }),
+  generateComplex({
+    nameA: 'TGFBR2', nameB: 'SMAD3', lenA: 567, lenB: 425,
+    domainsA: [{name:'ECD',s:1,e:159},{name:'TM',s:160,e:185},{name:'Kinase',s:186,e:567}],
+    domainsB: [{name:'MH1',s:1,e:145},{name:'Linker',s:146,e:230},{name:'MH2',s:231,e:425}],
+    numXlinks: 20, numContacts: 30, iptm: 0.75, dockq: 0.63,
+    color_a: '#f43f5e', color_b: '#fbbf24',
+  }),
+];
+
+let currentComplex = COMPLEXES[0];
+let contactMode = 'pae';
+let secMode = 'sec';
+let xlinkFilter = 'all';
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER ENGINE
+// ═══════════════════════════════════════════════════════════════
+
+function loadComplex(idx, btn) {
+  currentComplex = COMPLEXES[idx];
+  document.querySelectorAll('.complex-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  
+  document.getElementById('meta-iptm').textContent = currentComplex.iptm.toFixed(2);
+  document.getElementById('meta-dockq').textContent = currentComplex.dockq.toFixed(2);
+  document.getElementById('meta-xl').textContent = currentComplex.xlSat.toFixed(0) + '%';
+  
+  renderAll();
+}
+
+function renderAll() {
+  renderCircularMap();
+  renderContactMap();
+  renderInterface();
+  renderSEC();
+  renderPLDDT();
+}
+
+// ── Circular Crosslink Map ──
+function renderCircularMap() {
+  const container = document.getElementById('circular-svg').parentElement;
+  const W = container.clientWidth;
+  const H = container.clientHeight;
+  const svg = d3.select('#circular-svg');
+  svg.selectAll('*').remove();
+  svg.attr('viewBox', `0 0 ${W} ${H}`);
+
+  const cx = W / 2, cy = H / 2;
+  const R = Math.min(W, H) * 0.38;
+  const c = currentComplex;
+  const totalLen = c.lenA + c.lenB;
+  const gap = 0.04;
+  const arcA = { start: gap, end: (c.lenA / totalLen) * Math.PI * 2 - gap };
+  const arcB = { start: (c.lenA / totalLen) * Math.PI * 2 + gap, end: Math.PI * 2 - gap };
+
+  const g = svg.append('g').attr('transform', `translate(${cx},${cy})`);
+
+  // Draw arcs
+  function drawArc(startAngle, endAngle, color, label, domains, protLen, offset) {
+    const arc = d3.arc().innerRadius(R - 14).outerRadius(R).startAngle(startAngle).endAngle(endAngle).cornerRadius(4);
+    g.append('path').attr('d', arc).attr('fill', color).attr('opacity', 0.7);
+
+    // Domain sub-arcs
+    domains.forEach((dom, di) => {
+      const domStart = startAngle + (dom.s / protLen) * (endAngle - startAngle);
+      const domEnd = startAngle + (dom.e / protLen) * (endAngle - startAngle);
+      const domArc = d3.arc().innerRadius(R - 24).outerRadius(R - 16).startAngle(domStart).endAngle(domEnd).cornerRadius(2);
+      g.append('path').attr('d', domArc).attr('fill', color).attr('opacity', 0.3 + (di % 2) * 0.2);
+      
+      // Domain label
+      const midAngle = (domStart + domEnd) / 2 - Math.PI / 2;
+      const lx = Math.cos(midAngle) * (R - 32);
+      const ly = Math.sin(midAngle) * (R - 32);
+      g.append('text').attr('class', 'domain-label')
+        .attr('x', lx).attr('y', ly)
+        .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+        .attr('fill', color)
+        .text(dom.name);
+    });
+
+    // Protein label
+    const midAngle = (startAngle + endAngle) / 2 - Math.PI / 2;
+    const lx = Math.cos(midAngle) * (R + 18);
+    const ly = Math.sin(midAngle) * (R + 18);
+    g.append('text').attr('class', 'arc-label')
+      .attr('x', lx).attr('y', ly)
+      .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+      .attr('fill', color)
+      .text(label);
+
+    // Tick marks
+    const tickInterval = Math.max(50, Math.round(protLen / 15 / 50) * 50);
+    for (let r = tickInterval; r < protLen; r += tickInterval) {
+      const angle = startAngle + (r / protLen) * (endAngle - startAngle) - Math.PI / 2;
+      const x1 = Math.cos(angle) * R;
+      const y1 = Math.sin(angle) * R;
+      const x2 = Math.cos(angle) * (R + 6);
+      const y2 = Math.sin(angle) * (R + 6);
+      g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
+        .attr('stroke', color).attr('stroke-width', 0.5).attr('opacity', 0.4);
+      const tx = Math.cos(angle) * (R + 12);
+      const ty = Math.sin(angle) * (R + 12);
+      g.append('text').attr('class', 'residue-tick-label')
+        .attr('x', tx).attr('y', ty)
+        .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+        .text(r);
+    }
+  }
+
+  const colA = getComputedColor(c.color_a);
+  const colB = getComputedColor(c.color_b);
+  drawArc(arcA.start, arcA.end, colA, c.nameA, c.domainsA, c.lenA, 0);
+  drawArc(arcB.start, arcB.end, colB, c.nameB, c.domainsB, c.lenB, c.lenA);
+
+  // Crosslinks
+  function resAngle(chain, resNum) {
+    if (chain === 'A') {
+      return arcA.start + (resNum / c.lenA) * (arcA.end - arcA.start);
+    } else {
+      return arcB.start + (resNum / c.lenB) * (arcB.end - arcB.start);
+    }
+  }
+
+  c.xlinks.forEach((xl, i) => {
+    const a1 = resAngle(xl.from.chain, xl.from.res) - Math.PI / 2;
+    const a2 = resAngle(xl.to.chain, xl.to.res) - Math.PI / 2;
+    const r = R - 18;
+    const x1 = Math.cos(a1) * r;
+    const y1 = Math.sin(a1) * r;
+    const x2 = Math.cos(a2) * r;
+    const y2 = Math.sin(a2) * r;
+
+    const color = xl.type === 'inter' ? 'var(--xlink-sat)' : 'var(--xlink-viol)';
+    const strokeDash = xl.satisfied ? 'none' : '4,3';
+    
+    const midR = r * 0.3 * (0.3 + Math.random() * 0.7);
+    const midAngle = (a1 + a2) / 2;
+    const mx = Math.cos(midAngle) * midR;
+    const my = Math.sin(midAngle) * midR;
+
+    const path = g.append('path')
+      .attr('class', `xlink-line xlink-${xl.type} ${!xl.satisfied ? 'xlink-violated' : ''}`)
+      .attr('d', `M${x1},${y1} Q${mx},${my} ${x2},${y2}`)
+      .attr('stroke', color)
+      .attr('stroke-dasharray', strokeDash)
+      .attr('opacity', xl.satisfied ? 0.5 : 0.3)
+      .attr('data-type', xl.type)
+      .attr('data-satisfied', xl.satisfied)
+      .style('animation-delay', `${i * 30}ms`)
+      .on('mouseover', (event) => {
+        showTip(event, `
+          <div class="tip-title">${xl.from.aa}${xl.from.res} (${xl.from.chain}) — ${xl.to.aa}${xl.to.res} (${xl.to.chain})</div>
+          <div class="tip-sub">${xl.type} · ${xl.distance.toFixed(1)}Å · ${xl.satisfied ? '✓ satisfied' : '✗ violated'}</div>
+        `);
+        path.classed('highlighted', true);
+      })
+      .on('mouseout', () => {
+        hideTip();
+        path.classed('highlighted', false);
+      });
+  });
+
+  applyXlinkFilter();
+}
+
+function filterXlinks(type, btn) {
+  xlinkFilter = type;
+  document.querySelectorAll('.panel:first-child .ctrl-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyXlinkFilter();
+}
+
+function applyXlinkFilter() {
+  d3.selectAll('.xlink-line').each(function() {
+    const el = d3.select(this);
+    const type = el.attr('data-type');
+    const sat = el.attr('data-satisfied') === 'true';
+    let show = true;
+    if (xlinkFilter === 'inter') show = type === 'inter';
+    else if (xlinkFilter === 'intra') show = type === 'intra';
+    else if (xlinkFilter === 'violated') show = !sat;
+    el.classed('dimmed', !show);
+    if (show) el.classed('highlighted', false);
+  });
+}
+
+// ── Contact / PAE Map ──
+function renderContactMap() {
+  const container = document.getElementById('contact-svg').parentElement;
+  const W = container.clientWidth;
+  const H = container.clientHeight;
+  const svg = d3.select('#contact-svg');
+  svg.selectAll('*').remove();
+  svg.attr('viewBox', `0 0 ${W} ${H}`);
+
+  const c = currentComplex;
+  const margin = { top: 35, right: 20, bottom: 20, left: 55 };
+  const size = Math.min(W - margin.left - margin.right, H - margin.top - margin.bottom);
+  const g = svg.append('g').attr('transform', `translate(${margin.left + (W - margin.left - margin.right - size)/2},${margin.top})`);
+
+  const n = c.paeSize * 2;
+  const cellSize = size / n;
+
+  // Color scales
+  const paeColor = d3.scaleSequential(d3.interpolateViridis).domain([31, 0]);
+  const contactColor = d3.scaleSequential(d3.interpolateInferno).domain([12, 0]);
+  const energyColor = d3.scaleSequential(d3.interpolateRdBu).domain([-8, 8]);
+
+  let colorFn;
+  if (contactMode === 'pae') colorFn = (v) => paeColor(v);
+  else if (contactMode === 'contact') colorFn = (v) => contactColor(Math.max(0, 12 - v));
+  else colorFn = (v) => energyColor(v - 15);
+
+  // Draw cells
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      g.append('rect')
+        .attr('class', 'contact-cell')
+        .attr('x', j * cellSize).attr('y', i * cellSize)
+        .attr('width', cellSize).attr('height', cellSize)
+        .attr('fill', colorFn(c.pae[i][j]))
+        .on('mouseover', (event) => {
+          const rI = i < c.paeSize ? Math.floor(i / c.paeSize * c.lenA) + 1 : Math.floor((i - c.paeSize) / c.paeSize * c.lenB) + 1;
+          const rJ = j < c.paeSize ? Math.floor(j / c.paeSize * c.lenA) + 1 : Math.floor((j - c.paeSize) / c.paeSize * c.lenB) + 1;
+          const chainI = i < c.paeSize ? c.nameA : c.nameB;
+          const chainJ = j < c.paeSize ? c.nameA : c.nameB;
+          showTip(event, `
+            <div class="tip-title">${chainI}:${rI} → ${chainJ}:${rJ}</div>
+            <div class="tip-sub">PAE: ${c.pae[i][j].toFixed(1)}Å</div>
+          `);
+        })
+        .on('mouseout', hideTip);
+    }
+  }
+
+  // Divider lines
+  const divPos = c.paeSize * cellSize;
+  g.append('line').attr('x1', divPos).attr('y1', 0).attr('x2', divPos).attr('y2', size)
+    .attr('stroke', 'white').attr('stroke-width', 1).attr('opacity', 0.4).attr('stroke-dasharray', '3,2');
+  g.append('line').attr('x1', 0).attr('y1', divPos).attr('x2', size).attr('y2', divPos)
+    .attr('stroke', 'white').attr('stroke-width', 1).attr('opacity', 0.4).attr('stroke-dasharray', '3,2');
+
+  // Labels
+  const colA = getComputedColor(c.color_a);
+  const colB = getComputedColor(c.color_b);
+
+  g.append('text').attr('class', 'contact-axis-title')
+    .attr('x', divPos / 2).attr('y', -12)
+    .attr('text-anchor', 'middle').attr('fill', colA).text(c.nameA);
+  g.append('text').attr('class', 'contact-axis-title')
+    .attr('x', divPos + (size - divPos) / 2).attr('y', -12)
+    .attr('text-anchor', 'middle').attr('fill', colB).text(c.nameB);
+  g.append('text').attr('class', 'contact-axis-title')
+    .attr('x', -14).attr('y', divPos / 2)
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+    .attr('fill', colA).attr('transform', `rotate(-90, -14, ${divPos/2})`)
+    .text(c.nameA);
+  g.append('text').attr('class', 'contact-axis-title')
+    .attr('x', -14).attr('y', divPos + (size - divPos) / 2)
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+    .attr('fill', colB).attr('transform', `rotate(-90, -14, ${divPos + (size-divPos)/2})`)
+    .text(c.nameB);
+
+  // Color bar
+  const barW = 12, barH = size * 0.6;
+  const barX = size + 10, barY = (size - barH) / 2;
+  const barDefs = svg.append('defs');
+  const grad = barDefs.append('linearGradient').attr('id', 'cb-grad').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1');
+  if (contactMode === 'pae') {
+    grad.append('stop').attr('offset', '0%').attr('stop-color', paeColor(0));
+    grad.append('stop').attr('offset', '100%').attr('stop-color', paeColor(31));
+  }
+  const barG = g.append('g').attr('transform', `translate(${barX},${barY})`);
+  barG.append('rect').attr('width', barW).attr('height', barH).attr('rx', 2)
+    .attr('fill', 'url(#cb-grad)');
+  barG.append('text').attr('class', 'axis-label').attr('x', barW + 4).attr('y', 4).text('0 Å');
+  barG.append('text').attr('class', 'axis-label').attr('x', barW + 4).attr('y', barH).text('31 Å');
+}
+
+function setContactMode(mode, btn) {
+  contactMode = mode;
+  document.querySelectorAll('.panel:nth-child(2) .ctrl-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const tag = document.getElementById('contact-mode-tag');
+  tag.textContent = mode === 'pae' ? 'PAE' : mode === 'contact' ? 'Distance' : 'ΔG';
+  renderContactMap();
+}
+
+// ── Interface Analysis ──
+function renderInterface() {
+  const panel = document.getElementById('interface-panel');
+  const c = currentComplex;
+  const colA = getComputedColor(c.color_a);
+  const colB = getComputedColor(c.color_b);
+
+  const totalEnergy = c.contacts.reduce((s, ct) => s + ct.energy, 0);
+
+  panel.innerHTML = `
+    <div class="if-summary fade-up">
+      <div class="if-stat">
+        <div class="if-stat-label">BSA (Å²)</div>
+        <div class="if-stat-value" style="color:var(--accent);">${c.bsa.toFixed(0)}</div>
+      </div>
+      <div class="if-stat">
+        <div class="if-stat-label">ΔG<sub>int</sub> (kcal/mol)</div>
+        <div class="if-stat-value" style="color:var(--confidence-high);">${c.dg.toFixed(1)}</div>
+      </div>
+      <div class="if-stat">
+        <div class="if-stat-label">Contacts</div>
+        <div class="if-stat-value" style="color:var(--protein-b);">${c.contacts.length}</div>
+      </div>
+      <div class="if-stat">
+        <div class="if-stat-label">Shape comp.</div>
+        <div class="if-stat-value" style="color:var(--confidence-med);">${(0.55 + Math.random()*0.2).toFixed(2)}</div>
+      </div>
+    </div>
+    <table class="if-residue-table">
+      <thead>
+        <tr>
+          <th>${c.nameA}</th>
+          <th>${c.nameB}</th>
+          <th>Dist</th>
+          <th>Type</th>
+          <th>ΔG</th>
+          <th>ΔSASA</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${c.contacts.map(ct => `
+          <tr>
+            <td class="res-name" style="color:${colA}">${ct.resA.aa}${ct.resA.num}</td>
+            <td class="res-name" style="color:${colB}">${ct.resB.aa}${ct.resB.num}</td>
+            <td>${ct.distance.toFixed(1)}Å</td>
+            <td><span class="bond-type-tag ${ct.bondCls}">${ct.bondType}</span></td>
+            <td style="color:${ct.energy < -3 ? 'var(--confidence-high)' : 'var(--text-dim)'}">${ct.energy.toFixed(1)}</td>
+            <td>${ct.sasa.toFixed(0)} Å²</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function sortInterface(by, btn) {
+  document.querySelectorAll('.panel:nth-child(3) .ctrl-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (by === 'distance') currentComplex.contacts.sort((a,b) => a.distance - b.distance);
+  else if (by === 'energy') currentComplex.contacts.sort((a,b) => a.energy - b.energy);
+  else currentComplex.contacts.sort((a,b) => b.sasa - a.sasa);
+  renderInterface();
+}
+
+// ── SEC / SPR / DSF ──
+function renderSEC() {
+  const container = document.getElementById('sec-svg').parentElement;
+  const W = container.clientWidth;
+  const H = container.clientHeight;
+  const svg = d3.select('#sec-svg');
+  svg.selectAll('*').remove();
+  svg.attr('viewBox', `0 0 ${W} ${H}`);
+
+  const c = currentComplex;
+  const margin = { top: 30, right: 30, bottom: 40, left: 55 };
+  const w = W - margin.left - margin.right;
+  const h = H - margin.top - margin.bottom;
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const colA = getComputedColor(c.color_a);
+  const colB = getComputedColor(c.color_b);
+
+  if (secMode === 'sec') {
+    const data = c.secData.points;
+    const x = d3.scaleLinear().domain([0, 50]).range([0, w]);
+    const y = d3.scaleLinear().domain([0, 1]).range([h, 0]);
+
+    // Axes
+    g.append('g').attr('transform', `translate(0,${h})`)
+      .call(d3.axisBottom(x).ticks(10).tickSize(-h).tickFormat(d => d))
+      .call(g => g.select('.domain').attr('stroke', 'var(--border-dim)'))
+      .call(g => g.selectAll('.tick line').attr('stroke', 'var(--border-dim)').attr('stroke-dasharray', '2,3'))
+      .call(g => g.selectAll('.tick text').attr('fill', 'var(--text-dim)').attr('font-family', 'IBM Plex Mono').attr('font-size', 9));
+
+    g.append('g')
+      .call(d3.axisLeft(y).ticks(5).tickSize(-w).tickFormat(d3.format('.1f')))
+      .call(g => g.select('.domain').attr('stroke', 'var(--border-dim)'))
+      .call(g => g.selectAll('.tick line').attr('stroke', 'var(--border-dim)').attr('stroke-dasharray', '2,3'))
+      .call(g => g.selectAll('.tick text').attr('fill', 'var(--text-dim)').attr('font-family', 'IBM Plex Mono').attr('font-size', 9));
+
+    // Total absorbance
+    const line = d3.line().x(d => x(d.fraction)).y(d => y(d.absorbance)).curve(d3.curveBasis);
+    const area = d3.area().x(d => x(d.fraction)).y0(h).y1(d => y(d.absorbance)).curve(d3.curveBasis);
+    
+    g.append('path').datum(data).attr('d', area).attr('class', 'sec-area').attr('fill', 'var(--accent)');
+    g.append('path').datum(data).attr('d', line).attr('class', 'sec-line').attr('stroke', 'var(--accent)');
+
+    // Deconvolved peaks
+    const lineC = d3.line().x(d => x(d.fraction)).y(d => y(d.complex)).curve(d3.curveBasis);
+    const lineA = d3.line().x(d => x(d.fraction)).y(d => y(d.monoA)).curve(d3.curveBasis);
+    const lineB = d3.line().x(d => x(d.fraction)).y(d => y(d.monoB)).curve(d3.curveBasis);
+    g.append('path').datum(data).attr('d', lineC).attr('fill', 'none').attr('stroke', '#22d3ee').attr('stroke-width', 1.5).attr('stroke-dasharray', '4,3').attr('opacity', 0.6);
+    g.append('path').datum(data).attr('d', lineA).attr('fill', 'none').attr('stroke', colA).attr('stroke-width', 1.5).attr('stroke-dasharray', '4,3').attr('opacity', 0.6);
+    g.append('path').datum(data).attr('d', lineB).attr('fill', 'none').attr('stroke', colB).attr('stroke-width', 1.5).attr('stroke-dasharray', '4,3').attr('opacity', 0.6);
+
+    // MW markers
+    [660, 440, 158, 44].forEach(mw => {
+      const frac = 10 + (Math.log(660/mw) / Math.log(660/44)) * 30;
+      g.append('line').attr('x1', x(frac)).attr('y1', 0).attr('x2', x(frac)).attr('y2', h)
+        .attr('stroke', 'var(--text-dim)').attr('stroke-width', 0.5).attr('stroke-dasharray', '2,4');
+      g.append('text').attr('class', 'sec-marker').attr('x', x(frac)).attr('y', -4)
+        .attr('text-anchor', 'middle').text(`${mw} kDa`);
+    });
+
+    // Axis labels
+    g.append('text').attr('x', w/2).attr('y', h + 32).attr('text-anchor', 'middle')
+      .attr('fill', 'var(--text-dim)').attr('font-size', 10).text('Fraction');
+    g.append('text').attr('x', -h/2).attr('y', -40).attr('text-anchor', 'middle')
+      .attr('fill', 'var(--text-dim)').attr('font-size', 10)
+      .attr('transform', 'rotate(-90)').text('A₂₈₀ (normalized)');
+
+    // Legend
+    const leg = g.append('g').attr('transform', `translate(${w - 130}, 5)`);
+    [{ label: `${c.nameA}:${c.nameB}`, color: '#22d3ee' }, { label: c.nameA, color: colA }, { label: c.nameB, color: colB }]
+      .forEach((item, i) => {
+        leg.append('line').attr('x1', 0).attr('y1', i*14).attr('x2', 16).attr('y2', i*14)
+          .attr('stroke', item.color).attr('stroke-width', 2).attr('stroke-dasharray', i>0?'4,3':'none');
+        leg.append('text').attr('x', 20).attr('y', i*14+3)
+          .attr('fill', 'var(--text-mid)').attr('font-size', 9).attr('font-family', 'IBM Plex Mono').text(item.label);
+      });
+
+  } else if (secMode === 'spr') {
+    const data = c.sprData.points;
+    const x = d3.scaleLinear().domain([0, 400]).range([0, w]);
+    const y = d3.scaleLinear().domain([0, d3.max(data, d => d.response) * 1.1]).range([h, 0]);
+
+    g.append('g').attr('transform', `translate(0,${h})`)
+      .call(d3.axisBottom(x).ticks(8).tickSize(-h))
+      .call(g => g.select('.domain').attr('stroke', 'var(--border-dim)'))
+      .call(g => g.selectAll('.tick line').attr('stroke', 'var(--border-dim)').attr('stroke-dasharray', '2,3'))
+      .call(g => g.selectAll('.tick text').attr('fill', 'var(--text-dim)').attr('font-family', 'IBM Plex Mono').attr('font-size', 9));
+
+    g.append('g')
+      .call(d3.axisLeft(y).ticks(5).tickSize(-w))
+      .call(g => g.select('.domain').attr('stroke', 'var(--border-dim)'))
+      .call(g => g.selectAll('.tick line').attr('stroke', 'var(--border-dim)').attr('stroke-dasharray', '2,3'))
+      .call(g => g.selectAll('.tick text').attr('fill', 'var(--text-dim)').attr('font-family', 'IBM Plex Mono').attr('font-size', 9));
+
+    const line = d3.line().x(d => x(d.time)).y(d => y(d.response)).curve(d3.curveBasis);
+    const area = d3.area().x(d => x(d.time)).y0(h).y1(d => y(d.response)).curve(d3.curveBasis);
+    g.append('path').datum(data).attr('d', area).attr('fill', colA).attr('opacity', 0.06);
+    g.append('path').datum(data).attr('d', line).attr('fill', 'none').attr('stroke', colA).attr('stroke-width', 2);
+
+    // Injection marker
+    g.append('line').attr('x1', x(200)).attr('y1', 0).attr('x2', x(200)).attr('y2', h)
+      .attr('stroke', 'var(--xlink-viol)').attr('stroke-width', 1).attr('stroke-dasharray', '4,3').attr('opacity', 0.5);
+    g.append('text').attr('x', x(200) + 4).attr('y', 10).attr('fill', 'var(--xlink-viol)').attr('font-size', 9).text('dissociation');
+
+    // KD annotation
+    g.append('text').attr('x', w/2).attr('y', 20).attr('text-anchor', 'middle')
+      .attr('fill', 'var(--accent)').attr('font-family', 'IBM Plex Mono').attr('font-size', 12).attr('font-weight', 500)
+      .text(`K_D = ${c.sprData.KD.toFixed(1)} nM`);
+
+    g.append('text').attr('x', w/2).attr('y', h + 32).attr('text-anchor', 'middle')
+      .attr('fill', 'var(--text-dim)').attr('font-size', 10).text('Time (s)');
+    g.append('text').attr('x', -h/2).attr('y', -40).attr('text-anchor', 'middle')
+      .attr('fill', 'var(--text-dim)').attr('font-size', 10)
+      .attr('transform', 'rotate(-90)').text('Response (RU)');
+
+  } else {
+    const data = c.dsfData.points;
+    const x = d3.scaleLinear().domain([25, 95]).range([0, w]);
+    const y = d3.scaleLinear().domain([0, 1.1]).range([h, 0]);
+
+    g.append('g').attr('transform', `translate(0,${h})`)
+      .call(d3.axisBottom(x).ticks(8).tickSize(-h))
+      .call(g => g.select('.domain').attr('stroke', 'var(--border-dim)'))
+      .call(g => g.selectAll('.tick line').attr('stroke', 'var(--border-dim)').attr('stroke-dasharray', '2,3'))
+      .call(g => g.selectAll('.tick text').attr('fill', 'var(--text-dim)').attr('font-family', 'IBM Plex Mono').attr('font-size', 9));
+
+    g.append('g')
+      .call(d3.axisLeft(y).ticks(5).tickSize(-w).tickFormat(d3.format('.1f')))
+      .call(g => g.select('.domain').attr('stroke', 'var(--border-dim)'))
+      .call(g => g.selectAll('.tick line').attr('stroke', 'var(--border-dim)').attr('stroke-dasharray', '2,3'))
+      .call(g => g.selectAll('.tick text').attr('fill', 'var(--text-dim)').attr('font-family', 'IBM Plex Mono').attr('font-size', 9));
+
+    const lineApo = d3.line().x(d => x(d.temp)).y(d => y(d.apo)).curve(d3.curveBasis);
+    const lineComp = d3.line().x(d => x(d.temp)).y(d => y(d.complex)).curve(d3.curveBasis);
+    g.append('path').datum(data).attr('d', lineApo).attr('fill', 'none').attr('stroke', colA).attr('stroke-width', 2);
+    g.append('path').datum(data).attr('d', lineComp).attr('fill', 'none').attr('stroke', 'var(--accent)').attr('stroke-width', 2);
+
+    // Tm markers
+    const tm1 = c.dsfData.tm1, tm2 = c.dsfData.tm2;
+    g.append('line').attr('x1', x(tm1)).attr('y1', y(0.5) - 10).attr('x2', x(tm1)).attr('y2', y(0.5) + 10)
+      .attr('stroke', colA).attr('stroke-width', 1.5);
+    g.append('line').attr('x1', x(tm2)).attr('y1', y(0.5) - 10).attr('x2', x(tm2)).attr('y2', y(0.5) + 10)
+      .attr('stroke', 'var(--accent)').attr('stroke-width', 1.5);
+
+    // Delta Tm annotation
+    g.append('line').attr('x1', x(tm1)).attr('y1', y(0.5) + 20).attr('x2', x(tm2)).attr('y2', y(0.5) + 20)
+      .attr('stroke', 'var(--confidence-med)').attr('stroke-width', 1).attr('marker-end', 'none');
+    g.append('text').attr('x', x((tm1+tm2)/2)).attr('y', y(0.5) + 34).attr('text-anchor', 'middle')
+      .attr('fill', 'var(--confidence-med)').attr('font-family', 'IBM Plex Mono').attr('font-size', 10)
+      .text(`ΔTm = +${c.dsfData.deltaTm.toFixed(1)}°C`);
+
+    // Legend
+    const leg = g.append('g').attr('transform', `translate(${10}, 5)`);
+    [{ label: `${c.nameA} apo`, color: colA }, { label: `+ ${c.nameB}`, color: 'var(--accent)' }]
+      .forEach((item, i) => {
+        leg.append('line').attr('x1', 0).attr('y1', i*14).attr('x2', 16).attr('y2', i*14)
+          .attr('stroke', item.color).attr('stroke-width', 2);
+        leg.append('text').attr('x', 20).attr('y', i*14+3)
+          .attr('fill', 'var(--text-mid)').attr('font-size', 9).attr('font-family', 'IBM Plex Mono').text(item.label);
+      });
+
+    g.append('text').attr('x', w/2).attr('y', h + 32).attr('text-anchor', 'middle')
+      .attr('fill', 'var(--text-dim)').attr('font-size', 10).text('Temperature (°C)');
+    g.append('text').attr('x', -h/2).attr('y', -40).attr('text-anchor', 'middle')
+      .attr('fill', 'var(--text-dim)').attr('font-size', 10)
+      .attr('transform', 'rotate(-90)').text('Fluorescence (norm.)');
+  }
+}
+
+function setSecMode(mode, btn) {
+  secMode = mode;
+  document.querySelectorAll('.panel:nth-child(4) .ctrl-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderSEC();
+}
+
+// ── pLDDT strip ──
+function renderPLDDT() {
+  const strip = document.getElementById('plddt-strip');
+  const c = currentComplex;
+  const binSize = 10;
+  const bins = [];
+  for (let i = 0; i < c.plddt.length; i += binSize) {
+    const slice = c.plddt.slice(i, i + binSize);
+    bins.push(slice.reduce((s, v) => s + v, 0) / slice.length);
+  }
+  strip.innerHTML = bins.map(v => {
+    const color = v >= 90 ? '#0053d6' : v >= 70 ? '#65cbf3' : v >= 50 ? '#ffdb13' : '#ff7d45';
+    return `<div class="plddt-segment" style="flex:1;background:${color};" title="pLDDT: ${v.toFixed(0)}"></div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════════
+
+function getComputedColor(varStr) {
+  if (varStr.startsWith('var(')) {
+    const prop = varStr.match(/var\((--[^)]+)\)/);
+    if (prop) return getComputedStyle(document.documentElement).getPropertyValue(prop[1]).trim();
+  }
+  return varStr;
+}
+
+const tip = document.getElementById('tip');
+function showTip(event, html) {
+  tip.innerHTML = html;
+  tip.classList.add('visible');
+  const x = Math.min(event.clientX + 12, window.innerWidth - 260);
+  const y = Math.min(event.clientY - 10, window.innerHeight - 100);
+  tip.style.left = x + 'px';
+  tip.style.top = y + 'px';
+}
+
+function hideTip() {
+  tip.classList.remove('visible');
+}
+
+// ── Init ──
+renderAll();
+
+// Resize
+window.addEventListener('resize', () => {
+  clearTimeout(window._resizeTimer);
+  window._resizeTimer = setTimeout(renderAll, 150);
+});
+</script>
+</body>
+</html>
