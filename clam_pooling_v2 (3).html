@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CLAM — Attention Pooling + Classifiers</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#f8f9fb; --surface:#fff; --surface2:#f0f2f5;
+  --border:#d0d5dd; --border-light:#e4e7ec;
+  --text:#1a1d23; --dim:#6b7280; --dimmer:#9ca3af;
+  --blue:#2563eb; --blue-bg:rgba(37,99,235,0.07);
+  --purple:#7c3aed; --purple-bg:rgba(124,58,237,0.07);
+  --teal:#0891b2; --teal-bg:rgba(8,145,178,0.07);
+  --orange:#d97706; --orange-bg:rgba(217,119,6,0.07);
+  --green:#059669; --green-bg:rgba(5,150,105,0.07);
+  --red:#dc2626; --red-bg:rgba(220,38,38,0.06);
+  --rose:#e11d48; --rose-bg:rgba(225,29,72,0.06);
+  --slate:#475569;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;line-height:1.5;padding:40px 24px 80px;}
+.page{max-width:1200px;margin:0 auto;}
+.hdr{text-align:center;margin-bottom:48px;padding-bottom:28px;border-bottom:2px solid var(--border-light);}
+.tag{display:inline-block;font-size:.6rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--blue);background:var(--blue-bg);border:1.5px solid rgba(37,99,235,.25);padding:5px 16px;border-radius:20px;margin-bottom:14px;}
+.hdr h1{font-size:2rem;font-weight:700;letter-spacing:-.7px;margin-bottom:8px;}
+.hdr .sub{color:var(--dim);font-size:.92rem;max-width:700px;margin:0 auto;}
+.specs{display:flex;justify-content:center;gap:28px;margin-top:18px;flex-wrap:wrap;}
+.specs span{font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--dim);background:var(--surface);border:1px solid var(--border-light);padding:4px 12px;border-radius:8px;}
+.specs span b{color:var(--text);}
+.section-label{display:flex;align-items:center;gap:12px;margin:44px 0 20px;padding-left:4px;}
+.section-label .num{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:.8rem;font-weight:700;color:#fff;flex-shrink:0;}
+.section-label h2{font-size:1.05rem;font-weight:600;letter-spacing:-.2px;}
+.section-label .slide-ref{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:.65rem;color:var(--dim);background:var(--surface2);padding:3px 10px;border-radius:6px;border:1px solid var(--border-light);}
+.card{background:var(--surface);border:1.5px solid var(--border-light);border-radius:14px;overflow:hidden;}
+.card-body{padding:28px;}
+.diagram-wrap{width:100%;overflow-x:auto;padding:8px 0;}
+.diagram-wrap svg{display:block;margin:0 auto;}
+svg text{font-family:'IBM Plex Sans',sans-serif;}
+svg .mono{font-family:'IBM Plex Mono',monospace;}
+.insight{display:flex;gap:12px;border-radius:10px;padding:14px 18px;margin-top:18px;font-size:.82rem;line-height:1.55;align-items:flex-start;}
+.insight .icon{font-size:1.1rem;flex-shrink:0;margin-top:1px;}
+.insight b{font-weight:700;}
+.insight-teal{background:var(--teal-bg);border:1px solid rgba(8,145,178,.2);color:#155e75;}
+.insight-blue{background:var(--blue-bg);border:1px solid rgba(37,99,235,.2);color:#1e40af;}
+.insight-green{background:var(--green-bg);border:1px solid rgba(5,150,105,.2);color:#065f46;}
+.insight-orange{background:var(--orange-bg);border:1px solid rgba(217,119,6,.2);color:#92400e;}
+.insight-purple{background:var(--purple-bg);border:1px solid rgba(124,58,237,.2);color:#5b21b6;}
+.insight-red{background:var(--red-bg);border:1px solid rgba(220,38,38,.2);color:#991b1b;}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:16px;}
+.stat{background:var(--surface2);border-radius:8px;padding:10px 14px;border:1px solid var(--border-light);text-align:center;}
+.stat .k{font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);}
+.stat .v{font-family:'IBM Plex Mono',monospace;font-size:.85rem;font-weight:700;margin-top:3px;}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="tag">HTML 2 · CLAM_MB</div>
+  <h1>Attention Pooling + Classifiers</h1>
+  <p class="sub">De K patches a 1 predicción — softmax normaliza, pooling agrega, classifiers deciden</p>
+  <div class="specs">
+    <span><b>Input</b> A(K,4) + H(K,512)</span>
+    <span><b>Softmax</b> por columna</span>
+    <span><b>Pool</b> Aᵀ·H → (4,512)</span>
+    <span><b>Classify</b> 4×(512→1)</span>
+    <span><b>Output</b> P(class)</span>
+    <span><b>Slides</b> 4-5</span>
+  </div>
+</div>
+
+<!-- ======== SECTION 1: Softmax ======== -->
+<div class="section-label">
+  <div class="num" style="background:var(--purple);">1</div>
+  <h2>Softmax Normalization — Scores crudos → pesos de atención</h2>
+  <span class="slide-ref">Slide 4</span>
+</div>
+<div class="card"><div class="card-body">
+  <div class="diagram-wrap">
+    <svg width="1050" height="310" viewBox="0 0 1050 310">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="9" markerHeight="7" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--slate)"/></marker>
+        <marker id="arr-purple" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="9" markerHeight="7" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--purple)"/></marker>
+      </defs>
+
+      <!-- ===== A_raw MATRIX (left) ===== -->
+      <rect x="15" y="30" width="300" height="200" rx="12" fill="rgba(220,38,38,.04)" stroke="var(--red)" stroke-width="1.8"/>
+      <text x="30" y="55" font-size="12" font-weight="700" fill="var(--red)">A_raw (K×4)</text>
+      <text x="190" y="55" font-size="9" fill="var(--dim)">← HTML 1</text>
+
+      <!-- Row labels -->
+      <text x="30" y="100" class="mono" font-size="9.5" fill="var(--dim)">p1: [</text>
+      <text x="30" y="120" class="mono" font-size="9.5" fill="var(--dim)">p2: [</text>
+      <text x="30" y="140" class="mono" font-size="9.5" fill="var(--dim)">p3: [</text>
+      <text x="30" y="160" class="mono" font-size="9.5" fill="var(--dim)">p4: [</text>
+      <text x="30" y="180" class="mono" font-size="9.5" fill="var(--dim)">p5: [</text>
+
+      <!-- Column 0 (cls_0) -->
+      <text x="80" y="78" text-anchor="middle" class="mono" font-size="8" fill="var(--dim)">cls_0</text>
+      <text x="80" y="100" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)"> 1.50,</text>
+      <text x="80" y="120" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">-0.40,</text>
+      <text x="80" y="140" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)"> 2.31,</text>
+      <text x="80" y="160" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)"> 0.10,</text>
+      <text x="80" y="180" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">-0.80,</text>
+
+      <!-- Column 1 (cls_1) -->
+      <text x="135" y="78" text-anchor="middle" class="mono" font-size="8" fill="var(--dim)">cls_1</text>
+      <text x="135" y="100" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)"> 0.20,</text>
+      <text x="135" y="120" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)"> 1.80,</text>
+      <text x="135" y="140" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">-0.85,</text>
+      <text x="135" y="160" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)"> 0.50,</text>
+      <text x="135" y="180" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)"> 0.60,</text>
+
+      <!-- Column 2 (cls_2) -->
+      <text x="192" y="78" text-anchor="middle" class="mono" font-size="8" fill="var(--dim)">cls_2</text>
+      <text x="192" y="100" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">-0.30,</text>
+      <text x="192" y="120" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)"> 0.60,</text>
+      <text x="192" y="140" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)"> 0.42,</text>
+      <text x="192" y="160" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)"> 2.10,</text>
+      <text x="192" y="180" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">-0.50,</text>
+
+      <!-- Column 3 (cls_3) -->
+      <text x="250" y="78" text-anchor="middle" class="mono" font-size="8" fill="var(--dim)">cls_3</text>
+      <text x="250" y="100" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)"> 0.80]</text>
+      <text x="250" y="120" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">-0.20]</text>
+      <text x="250" y="140" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">-1.10]</text>
+      <text x="250" y="160" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)"> 0.30]</text>
+      <text x="250" y="180" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)"> 1.20]</text>
+
+      <!-- Column highlight for cls_0 -->
+      <rect x="55" y="68" width="50" height="120" rx="4" fill="none" stroke="var(--red)" stroke-width="1.2" stroke-dasharray="4,2"/>
+
+      <text x="30" y="210" font-size="9" fill="var(--dim)">Cada columna = ranking</text>
+      <text x="30" y="225" font-size="9" font-weight="600" fill="var(--red)">Softmax se aplica por columna</text>
+
+      <!-- ===== SOFTMAX BOX (center) ===== -->
+      <line x1="320" y1="130" x2="375" y2="130" stroke="var(--purple)" stroke-width="2.5" marker-end="url(#arr-purple)"/>
+
+      <rect x="383" y="80" width="120" height="100" rx="14" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="3"/>
+      <text x="443" y="118" text-anchor="middle" font-size="16" font-weight="700" fill="var(--purple)">Softmax</text>
+      <text x="443" y="140" text-anchor="middle" font-size="10" fill="var(--dim)">per-column</text>
+      <text x="443" y="158" text-anchor="middle" class="mono" font-size="9" fill="var(--purple)">Σ col = 1.0</text>
+
+      <!-- Arrow out -->
+      <line x1="508" y1="130" x2="563" y2="130" stroke="var(--purple)" stroke-width="2.5" marker-end="url(#arr-purple)"/>
+
+      <!-- ===== A_norm MATRIX (right) ===== -->
+      <rect x="571" y="30" width="330" height="200" rx="12" fill="rgba(124,58,237,.04)" stroke="var(--purple)" stroke-width="2"/>
+      <text x="586" y="55" font-size="12" font-weight="700" fill="var(--purple)">A_norm (K×4)</text>
+      <text x="780" y="55" font-size="9" fill="var(--dim)">pesos de atención</text>
+
+      <!-- Column headers -->
+      <text x="636" y="78" text-anchor="middle" class="mono" font-size="8" fill="var(--dim)">cls_0</text>
+      <text x="696" y="78" text-anchor="middle" class="mono" font-size="8" fill="var(--dim)">cls_1</text>
+      <text x="756" y="78" text-anchor="middle" class="mono" font-size="8" fill="var(--dim)">cls_2</text>
+      <text x="816" y="78" text-anchor="middle" class="mono" font-size="8" fill="var(--dim)">cls_3</text>
+
+      <!-- Row labels -->
+      <text x="586" y="100" class="mono" font-size="9.5" fill="var(--dim)">p1: [</text>
+      <text x="586" y="120" class="mono" font-size="9.5" fill="var(--dim)">p2: [</text>
+      <text x="586" y="140" class="mono" font-size="9.5" fill="var(--dim)">p3: [</text>
+      <text x="586" y="160" class="mono" font-size="9.5" fill="var(--dim)">p4: [</text>
+      <text x="586" y="180" class="mono" font-size="9.5" fill="var(--dim)">p5: [</text>
+
+      <!-- cls_0 column values -->
+      <text x="636" y="100" text-anchor="middle" class="mono" font-size="9.5" font-weight="700" fill="var(--purple)">0.36,</text>
+      <text x="636" y="120" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">0.05,</text>
+      <text x="636" y="140" text-anchor="middle" class="mono" font-size="10" font-weight="700" fill="var(--red)">0.54,</text>
+      <text x="636" y="160" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">0.03,</text>
+      <text x="636" y="180" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">0.02,</text>
+
+      <!-- cls_1 column values -->
+      <text x="696" y="100" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">0.10,</text>
+      <text x="696" y="120" text-anchor="middle" class="mono" font-size="9.5" font-weight="700" fill="var(--purple)">0.49,</text>
+      <text x="696" y="140" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">0.03,</text>
+      <text x="696" y="160" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">0.13,</text>
+      <text x="696" y="180" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">0.25,</text>
+
+      <!-- cls_2 column values -->
+      <text x="756" y="100" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">0.06,</text>
+      <text x="756" y="120" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">0.15,</text>
+      <text x="756" y="140" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">0.12,</text>
+      <text x="756" y="160" text-anchor="middle" class="mono" font-size="9.5" font-weight="700" fill="var(--purple)">0.67,</text>
+      <text x="756" y="180" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">0.00,</text>
+
+      <!-- cls_3 column values -->
+      <text x="816" y="100" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">0.19]</text>
+      <text x="816" y="120" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">0.07]</text>
+      <text x="816" y="140" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">0.03]</text>
+      <text x="816" y="160" text-anchor="middle" class="mono" font-size="9.5" fill="var(--dim)">0.11]</text>
+      <text x="816" y="180" text-anchor="middle" class="mono" font-size="9.5" font-weight="700" fill="var(--purple)">0.60]</text>
+
+      <!-- Annotations on the right -->
+      <text x="906" y="100" font-size="9" fill="var(--dim)">Σ col = 1.0</text>
+      <text x="906" y="130" font-size="9" fill="var(--red)">cls_0: p3 →</text>
+      <text x="968" y="130" font-size="10" font-weight="700" fill="var(--red)">54%</text>
+      <text x="906" y="150" font-size="9" fill="var(--dim)">cls_2: p4 → 67%</text>
+      <text x="906" y="170" font-size="9" fill="var(--dim)">cls_3: p5 → 60%</text>
+
+      <!-- Heatmap connection below -->
+      <rect x="571" y="240" width="330" height="60" rx="10" fill="rgba(124,58,237,.04)" stroke="var(--purple)" stroke-width="1" stroke-dasharray="5,3"/>
+      <text x="586" y="265" font-size="10" fill="var(--purple)">🔬 Estos pesos generan los <tspan font-weight="700">heatmaps de atención</tspan>.</text>
+      <text x="586" y="285" font-size="9" fill="var(--dim)">Si ŷ = cls_0, se usa la columna cls_0 para colorear cada patch del WSI.</text>
+      <line x1="736" y1="234" x2="736" y2="240" stroke="var(--purple)" stroke-width="1" stroke-dasharray="3,2"/>
+    </svg>
+  </div>
+</div></div>
+
+<!-- ======== SECTION 2: Attention Pooling ======== -->
+<div class="section-label">
+  <div class="num" style="background:var(--teal);">2</div>
+  <h2>Attention Pooling — K patches → n representaciones de slide</h2>
+  <span class="slide-ref">Slide 4-5</span>
+</div>
+<div class="card"><div class="card-body">
+  <div class="diagram-wrap">
+    <svg width="1050" height="330" viewBox="0 0 1050 330">
+      <defs>
+        <marker id="arr-teal" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="9" markerHeight="7" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--teal)"/></marker>
+        <marker id="arr-blue" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="9" markerHeight="7" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--blue)"/></marker>
+      </defs>
+
+      <!-- ===== A_norm (left) ===== -->
+      <rect x="15" y="20" width="150" height="120" rx="10" fill="rgba(124,58,237,.06)" stroke="var(--purple)" stroke-width="2"/>
+      <text x="90" y="48" text-anchor="middle" font-size="12" font-weight="700" fill="var(--purple)">A_norm</text>
+      <text x="90" y="68" text-anchor="middle" class="mono" font-size="11" fill="var(--dim)">(K × 4)</text>
+      <text x="90" y="90" text-anchor="middle" font-size="9" fill="var(--dim)">5 patches</text>
+      <text x="90" y="108" text-anchor="middle" font-size="9" fill="var(--dim)">4 clases</text>
+      <text x="90" y="128" text-anchor="middle" font-size="8" fill="var(--purple)">cada col = 1.0</text>
+
+      <!-- Arrow with "Transpose" label -->
+      <line x1="170" y1="80" x2="235" y2="80" stroke="var(--purple)" stroke-width="2" marker-end="url(#arr-purple)"/>
+      <text x="202" y="72" text-anchor="middle" font-size="9" font-weight="700" fill="var(--purple)">Aᵀ</text>
+
+      <!-- ===== Aᵀ (transposed) ===== -->
+      <rect x="243" y="20" width="120" height="120" rx="10" fill="rgba(124,58,237,.1)" stroke="var(--purple)" stroke-width="2.5"/>
+      <text x="303" y="48" text-anchor="middle" font-size="12" font-weight="700" fill="var(--purple)">Aᵀ</text>
+      <text x="303" y="68" text-anchor="middle" class="mono" font-size="11" fill="var(--dim)">(4 × K)</text>
+      <text x="303" y="90" text-anchor="middle" font-size="9" fill="var(--dim)">4 clases</text>
+      <text x="303" y="108" text-anchor="middle" font-size="9" fill="var(--dim)">5 patches</text>
+      <text x="303" y="128" text-anchor="middle" font-size="8" fill="var(--purple)">cada fila = 1.0</text>
+
+      <!-- × symbol -->
+      <text x="390" y="86" text-anchor="middle" font-size="24" font-weight="700" fill="var(--teal)">·</text>
+
+      <!-- ===== H matrix ===== -->
+      <rect x="415" y="20" width="120" height="120" rx="10" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="2"/>
+      <text x="475" y="48" text-anchor="middle" font-size="12" font-weight="700" fill="var(--teal)">H</text>
+      <text x="475" y="68" text-anchor="middle" class="mono" font-size="11" fill="var(--dim)">(K × 512)</text>
+      <text x="475" y="90" text-anchor="middle" font-size="9" fill="var(--dim)">5 patches</text>
+      <text x="475" y="108" text-anchor="middle" font-size="9" fill="var(--dim)">compressed</text>
+      <text x="475" y="128" text-anchor="middle" font-size="8" fill="var(--teal)">from HTML 1</text>
+
+      <!-- = symbol -->
+      <text x="562" y="86" text-anchor="middle" font-size="24" font-weight="700" fill="var(--blue)">=</text>
+
+      <!-- ===== M result ===== -->
+      <rect x="588" y="20" width="130" height="120" rx="10" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="2.5"/>
+      <text x="653" y="48" text-anchor="middle" font-size="14" font-weight="700" fill="var(--blue)">M</text>
+      <text x="653" y="68" text-anchor="middle" class="mono" font-size="11" fill="var(--dim)">(4 × 512)</text>
+      <text x="653" y="92" text-anchor="middle" font-size="10" font-weight="600" fill="var(--blue)">4 slide-level</text>
+      <text x="653" y="110" text-anchor="middle" font-size="10" font-weight="600" fill="var(--blue)">representations</text>
+      <text x="653" y="132" text-anchor="middle" font-size="8" fill="var(--dim)">1 vector per class</text>
+
+      <!-- Arrow to classifiers -->
+      <line x1="723" y1="80" x2="775" y2="80" stroke="var(--blue)" stroke-width="2.5" marker-end="url(#arr-blue)"/>
+      <text x="749" y="70" text-anchor="middle" font-size="8" fill="var(--blue)">→ §3</text>
+
+      <!-- ===== Equation box below ===== -->
+      <rect x="15" y="168" width="703" height="60" rx="10" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+      <text x="35" y="195" font-size="11" font-weight="700" fill="var(--teal)">Eqn 2:</text>
+      <text x="100" y="195" class="mono" font-size="13" font-weight="600" fill="var(--teal)">h_slide,m = Σ_k  a_k,m · h_k</text>
+      <text x="380" y="195" font-size="10" fill="var(--dim)">← weighted average: cada clase "ve" el WSI desde su propia distribución de atención</text>
+      <text x="35" y="218" font-size="9" fill="var(--dim)">0 parámetros — pura multiplicación de matrices. La inteligencia viene de los pesos aprendidos en HTML 1.</text>
+
+      <!-- ===== Numerical example below ===== -->
+      <rect x="15" y="248" width="703" height="75" rx="10" fill="var(--surface2)" stroke="var(--border)" stroke-width="1.2"/>
+      <text x="35" y="272" font-size="11" font-weight="700" fill="var(--blue)">h_slide,0</text>
+      <text x="105" y="272" class="mono" font-size="10" fill="var(--dim)">= 0.36·h₁ + 0.05·h₂ +</text>
+      <text x="330" y="272" class="mono" font-size="10" font-weight="700" fill="var(--red)">0.54·h₃</text>
+      <text x="400" y="272" class="mono" font-size="10" fill="var(--dim)">+ 0.03·h₄ + 0.02·h₅</text>
+      <text x="590" y="272" font-size="9" fill="var(--dim)">p3 domina (54%)</text>
+
+      <text x="35" y="296" font-size="11" font-weight="700" fill="var(--blue)">h_slide,2</text>
+      <text x="105" y="296" class="mono" font-size="10" fill="var(--dim)">= 0.06·h₁ + 0.15·h₂ + 0.12·h₃ +</text>
+      <text x="400" y="296" class="mono" font-size="10" font-weight="700" fill="var(--purple)">0.67·h₄</text>
+      <text x="470" y="296" class="mono" font-size="10" fill="var(--dim)">+ 0.00·h₅</text>
+      <text x="590" y="296" font-size="9" fill="var(--dim)">p4 domina (67%)</text>
+
+      <text x="35" y="318" font-size="9" fill="var(--dim)">→ Cada clase "resume" el WSI usando regiones diferentes. Eso es la clave de CLAM multi-branch.</text>
+    </svg>
+  </div>
+</div></div>
+
+<!-- ======== SECTION 3: Classifiers → Prediction ======== -->
+<div class="section-label">
+  <div class="num" style="background:var(--green);">3</div>
+  <h2>Slide-Level Classifiers → Predicción</h2>
+  <span class="slide-ref">Slide 5</span>
+</div>
+<div class="card"><div class="card-body">
+  <div class="diagram-wrap">
+    <svg width="1050" height="290" viewBox="0 0 1050 290">
+      <defs>
+        <marker id="arr-green" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="9" markerHeight="7" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--green)"/></marker>
+        <marker id="arr-orange" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="9" markerHeight="7" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--orange)"/></marker>
+      </defs>
+
+      <!-- ===== M input ===== -->
+      <rect x="15" y="60" width="95" height="170" rx="10" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="2"/>
+      <text x="62" y="90" text-anchor="middle" font-size="12" font-weight="700" fill="var(--blue)">M</text>
+      <text x="62" y="110" text-anchor="middle" class="mono" font-size="9" fill="var(--dim)">(4×512)</text>
+
+      <!-- 4 rows visualization -->
+      <rect x="24" y="122" width="78" height="14" rx="3" fill="rgba(220,38,38,.12)"/>
+      <text x="63" y="133" text-anchor="middle" class="mono" font-size="7" fill="var(--red)">h_slide,0</text>
+      <rect x="24" y="140" width="78" height="14" rx="3" fill="rgba(37,99,235,.12)"/>
+      <text x="63" y="151" text-anchor="middle" class="mono" font-size="7" fill="var(--blue)">h_slide,1</text>
+      <rect x="24" y="158" width="78" height="14" rx="3" fill="rgba(124,58,237,.12)"/>
+      <text x="63" y="169" text-anchor="middle" class="mono" font-size="7" fill="var(--purple)">h_slide,2</text>
+      <rect x="24" y="176" width="78" height="14" rx="3" fill="rgba(5,150,105,.12)"/>
+      <text x="63" y="187" text-anchor="middle" class="mono" font-size="7" fill="var(--green)">h_slide,3</text>
+
+      <text x="62" y="215" text-anchor="middle" font-size="8" fill="var(--dim)">4 slide reps</text>
+
+      <!-- ===== Fan out arrows ===== -->
+      <line x1="115" y1="128" x2="170" y2="80" stroke="var(--red)" stroke-width="1.8"/>
+      <line x1="115" y1="146" x2="170" y2="130" stroke="var(--blue)" stroke-width="1.8"/>
+      <line x1="115" y1="164" x2="170" y2="180" stroke="var(--purple)" stroke-width="1.8"/>
+      <line x1="115" y1="182" x2="170" y2="230" stroke="var(--green)" stroke-width="1.8"/>
+
+      <!-- ===== 4 Classifier boxes ===== -->
+      <!-- W_c,0 -->
+      <rect x="175" y="57" width="130" height="46" rx="8" fill="var(--red-bg)" stroke="var(--red)" stroke-width="2"/>
+      <text x="240" y="77" text-anchor="middle" font-size="10" font-weight="700" fill="var(--red)">W_c,0</text>
+      <text x="240" y="96" text-anchor="middle" class="mono" font-size="8" fill="var(--dim)">Linear(512→1)</text>
+
+      <!-- W_c,1 -->
+      <rect x="175" y="111" width="130" height="46" rx="8" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="2"/>
+      <text x="240" y="131" text-anchor="middle" font-size="10" font-weight="700" fill="var(--blue)">W_c,1</text>
+      <text x="240" y="150" text-anchor="middle" class="mono" font-size="8" fill="var(--dim)">Linear(512→1)</text>
+
+      <!-- W_c,2 -->
+      <rect x="175" y="165" width="130" height="46" rx="8" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="2"/>
+      <text x="240" y="185" text-anchor="middle" font-size="10" font-weight="700" fill="var(--purple)">W_c,2</text>
+      <text x="240" y="204" text-anchor="middle" class="mono" font-size="8" fill="var(--dim)">Linear(512→1)</text>
+
+      <!-- W_c,3 -->
+      <rect x="175" y="219" width="130" height="46" rx="8" fill="var(--green-bg)" stroke="var(--green)" stroke-width="2"/>
+      <text x="240" y="239" text-anchor="middle" font-size="10" font-weight="700" fill="var(--green)">W_c,3</text>
+      <text x="240" y="258" text-anchor="middle" class="mono" font-size="8" fill="var(--dim)">Linear(512→1)</text>
+
+      <!-- ===== Arrows to scores ===== -->
+      <line x1="310" y1="80" x2="365" y2="80" stroke="var(--red)" stroke-width="1.5"/>
+      <line x1="310" y1="134" x2="365" y2="134" stroke="var(--blue)" stroke-width="1.5"/>
+      <line x1="310" y1="188" x2="365" y2="188" stroke="var(--purple)" stroke-width="1.5"/>
+      <line x1="310" y1="242" x2="365" y2="242" stroke="var(--green)" stroke-width="1.5"/>
+
+      <!-- ===== Raw logits ===== -->
+      <rect x="370" y="57" width="72" height="46" rx="8" fill="var(--surface2)" stroke="var(--red)" stroke-width="1.5"/>
+      <text x="406" y="78" text-anchor="middle" class="mono" font-size="13" font-weight="700" fill="var(--red)">2.45</text>
+      <text x="406" y="96" text-anchor="middle" font-size="7" fill="var(--dim)">s_slide,0</text>
+
+      <rect x="370" y="111" width="72" height="46" rx="8" fill="var(--surface2)" stroke="var(--blue)" stroke-width="1.5"/>
+      <text x="406" y="132" text-anchor="middle" class="mono" font-size="13" font-weight="700" fill="var(--blue)">-0.72</text>
+      <text x="406" y="150" text-anchor="middle" font-size="7" fill="var(--dim)">s_slide,1</text>
+
+      <rect x="370" y="165" width="72" height="46" rx="8" fill="var(--surface2)" stroke="var(--purple)" stroke-width="1.5"/>
+      <text x="406" y="186" text-anchor="middle" class="mono" font-size="13" font-weight="700" fill="var(--purple)">0.18</text>
+      <text x="406" y="204" text-anchor="middle" font-size="7" fill="var(--dim)">s_slide,2</text>
+
+      <rect x="370" y="219" width="72" height="46" rx="8" fill="var(--surface2)" stroke="var(--green)" stroke-width="1.5"/>
+      <text x="406" y="240" text-anchor="middle" class="mono" font-size="13" font-weight="700" fill="var(--green)">-1.30</text>
+      <text x="406" y="258" text-anchor="middle" font-size="7" fill="var(--dim)">s_slide,3</text>
+
+      <!-- ===== Converge into Softmax ===== -->
+      <line x1="447" y1="80" x2="508" y2="138" stroke="var(--dim)" stroke-width="1"/>
+      <line x1="447" y1="134" x2="508" y2="145" stroke="var(--dim)" stroke-width="1"/>
+      <line x1="447" y1="188" x2="508" y2="155" stroke="var(--dim)" stroke-width="1"/>
+      <line x1="447" y1="242" x2="508" y2="162" stroke="var(--dim)" stroke-width="1"/>
+
+      <rect x="513" y="112" width="110" height="78" rx="14" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="3"/>
+      <text x="568" y="143" text-anchor="middle" font-size="14" font-weight="700" fill="var(--orange)">Softmax</text>
+      <text x="568" y="163" text-anchor="middle" font-size="9" fill="var(--dim)">logits → P(cls)</text>
+      <text x="568" y="180" text-anchor="middle" font-size="8" fill="var(--orange)">inference only</text>
+
+      <!-- Arrow out of softmax -->
+      <line x1="628" y1="150" x2="685" y2="150" stroke="var(--orange)" stroke-width="2.5" marker-end="url(#arr-orange)"/>
+
+      <!-- ===== Final prediction bar chart ===== -->
+      <rect x="693" y="40" width="200" height="240" rx="12" fill="var(--surface2)" stroke="var(--orange)" stroke-width="2"/>
+      <text x="793" y="66" text-anchor="middle" font-size="12" font-weight="700" fill="var(--orange)">P(class)</text>
+
+      <!-- cls_0 bar -->
+      <text x="710" y="100" font-size="10" font-weight="600" fill="var(--red)">cls_0</text>
+      <rect x="760" y="88" width="120" height="16" rx="4" fill="rgba(220,38,38,.1)"/>
+      <rect x="760" y="88" width="86" height="16" rx="4" fill="var(--red)" fill-opacity=".6"/>
+      <text x="855" y="100" class="mono" font-size="11" font-weight="700" fill="var(--red)">0.72</text>
+
+      <!-- cls_1 bar -->
+      <text x="710" y="134" font-size="10" font-weight="600" fill="var(--blue)">cls_1</text>
+      <rect x="760" y="122" width="120" height="16" rx="4" fill="rgba(37,99,235,.1)"/>
+      <rect x="760" y="122" width="4" height="16" rx="4" fill="var(--blue)" fill-opacity=".6"/>
+      <text x="855" y="134" class="mono" font-size="11" font-weight="700" fill="var(--blue)">0.03</text>
+
+      <!-- cls_2 bar -->
+      <text x="710" y="168" font-size="10" font-weight="600" fill="var(--purple)">cls_2</text>
+      <rect x="760" y="156" width="120" height="16" rx="4" fill="rgba(124,58,237,.1)"/>
+      <rect x="760" y="156" width="8" height="16" rx="4" fill="var(--purple)" fill-opacity=".6"/>
+      <text x="855" y="168" class="mono" font-size="11" font-weight="700" fill="var(--purple)">0.07</text>
+
+      <!-- cls_3 bar -->
+      <text x="710" y="202" font-size="10" font-weight="600" fill="var(--green)">cls_3</text>
+      <rect x="760" y="190" width="120" height="16" rx="4" fill="rgba(5,150,105,.1)"/>
+      <rect x="760" y="190" width="2" height="16" rx="4" fill="var(--green)" fill-opacity=".6"/>
+      <text x="855" y="202" class="mono" font-size="11" font-weight="700" fill="var(--green)">0.02</text>
+
+      <!-- Winner highlight -->
+      <rect x="693" y="230" width="200" height="40" rx="0 0 12 12" fill="rgba(220,38,38,.08)"/>
+      <text x="793" y="256" text-anchor="middle" font-size="14" font-weight="700" fill="var(--red)">ŷ = cls_0 ✓</text>
+
+      <!-- ===== Training note (CE Loss path) ===== -->
+      <rect x="460" y="40" width="150" height="48" rx="8" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="1.2" stroke-dasharray="5,3"/>
+      <text x="535" y="58" text-anchor="middle" font-size="9" font-weight="700" fill="var(--blue)">During Training:</text>
+      <text x="535" y="76" text-anchor="middle" font-size="8" fill="var(--dim)">s_slide → CE(s, Y)</text>
+      <text x="535" y="86" text-anchor="middle" font-size="7" fill="var(--dim)">(no softmax needed)</text>
+
+      <!-- Arrow from raw scores to training -->
+      <path d="M 450,100 Q 470,80 480,72" stroke="var(--blue)" stroke-width="1" stroke-dasharray="3,2" fill="none"/>
+    </svg>
+  </div>
+
+  <div class="insight insight-green">
+    <span class="icon">⚠️</span>
+    <span><b>Training vs Inference:</b> El softmax final solo se aplica en inference. Durante training, <code>nn.CrossEntropyLoss</code> espera logits crudos (ya incluye log-softmax internamente). No confundir con el softmax de §1 que normaliza la atención — ese sí se usa siempre.</span>
+  </div>
+
+  <div class="insight insight-blue">
+    <span class="icon">🔍</span>
+    <span><b>¿Por qué 4 classifiers independientes?</b> Cada W_c,m opera solo sobre h_slide,m. Si concatenáramos (4×512=2048) y usáramos un solo classifier, las representaciones de clase se mezclarían y perderíamos la estructura multi-branch.</span>
+  </div>
+</div></div>
+
+<!-- ======== SECTION 4: Pipeline + Params ======== -->
+<div class="section-label">
+  <div class="num" style="background:var(--slate);">4</div>
+  <h2>Pipeline de inference completo + Parámetros</h2>
+</div>
+<div class="card"><div class="card-body">
+  <div class="diagram-wrap">
+    <svg width="1000" height="70" viewBox="0 0 1000 70">
+      <defs>
+        <marker id="arr2" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="9" markerHeight="7" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--slate)"/></marker>
+      </defs>
+
+      <rect x="5" y="12" width="95" height="46" rx="8" fill="var(--surface2)" stroke="var(--border)" stroke-width="1"/>
+      <text x="52" y="40" text-anchor="middle" class="mono" font-size="8" font-weight="600" fill="var(--dim)">(K,1024)</text>
+
+      <line x1="105" y1="35" x2="125" y2="35" stroke="var(--slate)" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <rect x="130" y="8" width="110" height="54" rx="8" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+      <text x="185" y="30" text-anchor="middle" font-size="9" font-weight="700" fill="var(--teal)">FC+ReLU+Drop</text>
+      <text x="185" y="50" text-anchor="middle" class="mono" font-size="8" fill="var(--dim)">→(K,512)</text>
+
+      <line x1="245" y1="35" x2="265" y2="35" stroke="var(--slate)" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <rect x="270" y="8" width="110" height="54" rx="8" fill="var(--rose-bg)" stroke="var(--rose)" stroke-width="1.5"/>
+      <text x="325" y="30" text-anchor="middle" font-size="9" font-weight="700" fill="var(--rose)">Gated Attn</text>
+      <text x="325" y="50" text-anchor="middle" class="mono" font-size="8" fill="var(--dim)">→A(K,4)+H</text>
+
+      <line x1="385" y1="35" x2="405" y2="35" stroke="var(--slate)" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <rect x="410" y="8" width="100" height="54" rx="8" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+      <text x="460" y="30" text-anchor="middle" font-size="9" font-weight="700" fill="var(--purple)">Softmax</text>
+      <text x="460" y="50" text-anchor="middle" class="mono" font-size="8" fill="var(--dim)">col-wise</text>
+
+      <line x1="515" y1="35" x2="535" y2="35" stroke="var(--slate)" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <rect x="540" y="8" width="100" height="54" rx="8" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+      <text x="590" y="30" text-anchor="middle" font-size="9" font-weight="700" fill="var(--teal)">Aᵀ · H</text>
+      <text x="590" y="50" text-anchor="middle" class="mono" font-size="8" fill="var(--dim)">→M(4,512)</text>
+
+      <line x1="645" y1="35" x2="665" y2="35" stroke="var(--slate)" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <rect x="670" y="8" width="100" height="54" rx="8" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+      <text x="720" y="30" text-anchor="middle" font-size="9" font-weight="700" fill="var(--green)">4× W_c</text>
+      <text x="720" y="50" text-anchor="middle" class="mono" font-size="8" fill="var(--dim)">→s(4)</text>
+
+      <line x1="775" y1="35" x2="795" y2="35" stroke="var(--slate)" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <rect x="800" y="8" width="100" height="54" rx="8" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="2"/>
+      <text x="850" y="30" text-anchor="middle" font-size="9" font-weight="700" fill="var(--orange)">Softmax</text>
+      <text x="850" y="50" text-anchor="middle" class="mono" font-size="8" fill="var(--orange)">→P(cls)</text>
+
+      <line x1="905" y1="35" x2="925" y2="35" stroke="var(--slate)" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <rect x="930" y="8" width="60" height="54" rx="8" fill="var(--red-bg)" stroke="var(--red)" stroke-width="2"/>
+      <text x="960" y="32" text-anchor="middle" font-size="10" font-weight="700" fill="var(--red)">ŷ</text>
+      <text x="960" y="50" text-anchor="middle" font-size="8" fill="var(--dim)">argmax</text>
+    </svg>
+  </div>
+
+  <div class="stats" style="grid-template-columns:repeat(4,1fr);">
+    <div class="stat"><div class="k">Softmax (attn)</div><div class="v" style="color:var(--purple)">0 params</div></div>
+    <div class="stat"><div class="k">Aᵀ·H Pooling</div><div class="v" style="color:var(--teal)">0 params</div></div>
+    <div class="stat"><div class="k">4× W_c classifiers</div><div class="v" style="color:var(--green)">2,052</div></div>
+    <div class="stat"><div class="k">Total HTML 1+2</div><div class="v" style="color:var(--text)">791,048</div></div>
+  </div>
+
+  <div class="insight insight-orange">
+    <span class="icon">📌</span>
+    <span><b>Dos softmax distintos:</b> (1) Column-wise sobre A_raw → normaliza atención (siempre). (2) Sobre los 4 logits finales → probabilidades de clase (solo inference). No confundirlos.</span>
+  </div>
+</div></div>
+
+</div>
+</body>
+</html>
