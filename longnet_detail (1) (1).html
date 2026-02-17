@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LongNet Slide-Level Encoder — Módulo 2 Detallado</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fafbfc; --surface: #ffffff; --surface2: #f0f2f5;
+    --border: #d0d5dd; --border-light: #e4e7ec;
+    --text: #1a1d23; --text-dim: #6b7280;
+    --blue: #2563eb; --blue-bg: rgba(37,99,235,0.06); --blue-border: rgba(37,99,235,0.2);
+    --purple: #7c3aed; --purple-bg: rgba(124,58,237,0.06); --purple-border: rgba(124,58,237,0.2);
+    --teal: #0891b2; --teal-bg: rgba(8,145,178,0.06); --teal-border: rgba(8,145,178,0.2);
+    --orange: #d97706; --orange-bg: rgba(217,119,6,0.06); --orange-border: rgba(217,119,6,0.2);
+    --green: #059669; --green-bg: rgba(5,150,105,0.06); --green-border: rgba(5,150,105,0.2);
+    --red: #dc2626; --red-bg: rgba(220,38,38,0.06); --red-border: rgba(220,38,38,0.18);
+    --rose: #e11d48;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'IBM Plex Sans',sans-serif; line-height:1.6; padding:32px 20px 80px; }
+  .page { max-width:1150px; margin:0 auto; }
+
+  .hdr { text-align:center; margin-bottom:36px; padding-bottom:20px; border-bottom:2px solid var(--border-light); }
+  .hdr-tag { display:inline-block; font-size:0.65rem; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--purple); background:var(--purple-bg); border:1px solid var(--purple-border); padding:4px 14px; border-radius:20px; margin-bottom:10px; }
+  .hdr h1 { font-size:1.6rem; font-weight:700; letter-spacing:-0.5px; margin-bottom:6px; }
+  .hdr p { color:var(--text-dim); font-size:0.88rem; max-width:700px; margin:0 auto; }
+
+  .section { background:var(--surface); border:1.5px solid var(--border-light); border-radius:12px; overflow:hidden; margin-bottom:20px; }
+  .section-head { display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid var(--border-light); }
+  .section-head .dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .section-head h2 { font-size:0.88rem; font-weight:600; }
+  .section-head .badge { margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:0.68rem; font-weight:500; padding:3px 10px; border-radius:6px; }
+  .section-body { padding:20px; }
+
+  .diagram { width:100%; overflow-x:auto; }
+  .diagram svg { display:block; margin:0 auto; }
+  svg text { font-family:'IBM Plex Sans',sans-serif; }
+  .mono { font-family:'IBM Plex Mono',monospace; }
+
+  .flow-connector { display:flex; align-items:center; justify-content:center; padding:6px 0; }
+  .flow-connector .arrow { width:2px; height:24px; background:var(--border); position:relative; }
+  .flow-connector .arrow::after { content:'▼'; position:absolute; bottom:-10px; left:50%; transform:translateX(-50%); font-size:10px; color:var(--border); }
+  .flow-connector .dim-label { font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:var(--text-dim); background:var(--surface2); padding:2px 10px; border-radius:10px; margin-left:12px; border:1px solid var(--border-light); }
+
+  .info-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-top:14px; }
+  .info-cell { background:var(--surface2); border-radius:8px; padding:10px 14px; border:1px solid var(--border-light); }
+  .info-cell .lbl { font-size:0.62rem; font-weight:600; text-transform:uppercase; letter-spacing:0.8px; color:var(--text-dim); }
+  .info-cell .val { font-family:'IBM Plex Mono',monospace; font-size:0.82rem; font-weight:600; margin-top:2px; }
+
+  .note { border-radius:8px; padding:14px 18px; margin-top:16px; font-size:0.82rem; line-height:1.6; }
+  .note strong { font-weight:700; }
+  .note-purple { background:var(--purple-bg); border:1px solid var(--purple-border); color:#5b21b6; }
+  .note-blue { background:var(--blue-bg); border:1px solid var(--blue-border); color:#1e40af; }
+  .note-green { background:var(--green-bg); border:1px solid var(--green-border); color:#065f46; }
+  .note-orange { background:var(--orange-bg); border:1px solid var(--orange-border); color:#92400e; }
+  .note-red { background:var(--red-bg); border:1px solid var(--red-border); color:#991b1b; }
+  .note-teal { background:var(--teal-bg); border:1px solid var(--teal-border); color:#155e75; }
+
+  .vs-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:14px; }
+  .vs-card { border-radius:10px; padding:16px; border:1.5px solid var(--border-light); }
+  .vs-card h4 { font-size:0.78rem; font-weight:700; margin-bottom:6px; }
+  .vs-card p { font-size:0.78rem; color:var(--text-dim); }
+  .vs-card .big { font-family:'IBM Plex Mono',monospace; font-size:1.4rem; font-weight:700; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hdr">
+    <div class="hdr-tag">Módulo 2 — Slide-Level Encoder</div>
+    <h1>LongNet: Dilated Attention para Gigapixel WSIs</h1>
+    <p>Cómo miles de patch embeddings "se hablan entre sí" sin explotar en complejidad cuadrática. Drop-in replacement de self-attention estándar con complejidad O(N·log N).</p>
+  </div>
+
+  <!-- ==================== EL PROBLEMA ==================== -->
+  <div class="section" style="border-color:var(--red-border);">
+    <div class="section-head">
+      <div class="dot" style="background:var(--red);"></div>
+      <h2>El Problema: ¿Por qué no usar Self-Attention estándar?</h2>
+      <span class="badge" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);">O(N²) imposible</span>
+    </div>
+    <div class="section-body">
+      <div class="diagram">
+        <svg width="1050" height="190" viewBox="0 0 1050 190">
+          <defs>
+            <marker id="a-red" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="7" markerHeight="5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--red)"/></marker>
+            <marker id="a-purple" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="7" markerHeight="5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--purple)"/></marker>
+            <marker id="a-green" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="7" markerHeight="5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--green)"/></marker>
+            <marker id="a-blue" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="7" markerHeight="5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--blue)"/></marker>
+            <marker id="a-dim" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="7" markerHeight="5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--text-dim)"/></marker>
+            <marker id="a-orange" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="7" markerHeight="5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--orange)"/></marker>
+            <marker id="a-teal" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="7" markerHeight="5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="var(--teal)"/></marker>
+          </defs>
+
+          <!-- CONCH output reminder -->
+          <text x="20" y="20" font-size="10" font-weight="600" fill="var(--text)">Salida de CONCH (Módulo 1):</text>
+          <text x="20" y="38" font-size="9" fill="var(--text-dim)">Cada WSI produce N parches × 512 dims. N típico: 5,000–20,000+ parches.</text>
+
+          <!-- Small WSI patches row -->
+          <g transform="translate(20, 50)">
+            <rect x="0" y="0" width="14" height="14" rx="2" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="0.8"/>
+            <rect x="17" y="0" width="14" height="14" rx="2" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="0.8"/>
+            <rect x="34" y="0" width="14" height="14" rx="2" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="0.8"/>
+            <rect x="51" y="0" width="14" height="14" rx="2" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="0.8"/>
+            <rect x="68" y="0" width="14" height="14" rx="2" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="0.8"/>
+            <text x="95" y="11" font-size="11" fill="var(--text-dim)">···</text>
+            <rect x="115" y="0" width="14" height="14" rx="2" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="0.8"/>
+            <rect x="132" y="0" width="14" height="14" rx="2" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="0.8"/>
+            <text x="160" y="11" font-size="9" class="mono" fill="var(--blue)" font-weight="600">N = 10,000 parches</text>
+          </g>
+
+          <!-- Attention matrix comparison -->
+          <!-- Vanilla attention -->
+          <rect x="20" y="80" width="130" height="100" rx="8" fill="var(--red-bg)" stroke="var(--red)" stroke-width="1.5"/>
+          <text x="85" y="100" text-anchor="middle" font-size="10" font-weight="700" fill="var(--red)">Vanilla Attention</text>
+          <text x="85" y="118" text-anchor="middle" font-size="9" class="mono" fill="var(--red)">N × N matrix</text>
+          <text x="85" y="136" text-anchor="middle" font-size="11" class="mono" font-weight="700" fill="var(--red)">10K × 10K</text>
+          <text x="85" y="154" text-anchor="middle" font-size="9" class="mono" fill="var(--red)">= 100,000,000</text>
+          <text x="85" y="170" text-anchor="middle" font-size="8" fill="var(--red)">operaciones por capa 💥</text>
+
+          <!-- VS -->
+          <text x="175" y="135" text-anchor="middle" font-size="16" font-weight="700" fill="var(--text-dim)">vs</text>
+
+          <!-- Dilated attention -->
+          <rect x="200" y="80" width="130" height="100" rx="8" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+          <text x="265" y="100" text-anchor="middle" font-size="10" font-weight="700" fill="var(--green)">Dilated Attention</text>
+          <text x="265" y="118" text-anchor="middle" font-size="9" class="mono" fill="var(--green)">N × log(N)</text>
+          <text x="265" y="136" text-anchor="middle" font-size="11" class="mono" font-weight="700" fill="var(--green)">10K × ~13</text>
+          <text x="265" y="154" text-anchor="middle" font-size="9" class="mono" fill="var(--green)">= ~130,000</text>
+          <text x="265" y="170" text-anchor="middle" font-size="8" fill="var(--green)">operaciones por capa ✓</text>
+
+          <!-- Ratio -->
+          <rect x="360" y="105" width="110" height="50" rx="8" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+          <text x="415" y="126" text-anchor="middle" font-size="10" font-weight="700" fill="var(--purple)">Reducción:</text>
+          <text x="415" y="146" text-anchor="middle" font-size="14" class="mono" font-weight="700" fill="var(--purple)">~770×</text>
+
+          <!-- Why it matters -->
+          <rect x="510" y="80" width="500" height="100" rx="10" fill="white" stroke="var(--border)" stroke-width="1"/>
+          <text x="530" y="105" font-size="10" font-weight="700" fill="var(--text)">¿Por qué importa?</text>
+          <text x="530" y="125" font-size="9" fill="var(--text)">En CONCH, los 197 tokens hacían self-attention sin problema (197² = 38,809).</text>
+          <text x="530" y="142" font-size="9" fill="var(--text)">Pero ahora tenemos <tspan font-weight="700" fill="var(--red)">10,000+ tokens del slide completo</tspan>.</text>
+          <text x="530" y="159" font-size="9" fill="var(--text)">10,000² = <tspan font-weight="700" fill="var(--red)">100 millones</tspan> de operaciones por capa → no cabe en GPU.</text>
+          <text x="530" y="176" font-size="9" fill="var(--green)">LongNet resuelve esto con <tspan font-weight="700">dilated attention</tspan>: atención a múltiples escalas.</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-connector">
+    <div class="arrow"></div>
+    <span class="dim-label">Input: N × 512 (de CONCH)</span>
+  </div>
+
+  <!-- ==================== IDEA CENTRAL ==================== -->
+  <div class="section" style="border-color:var(--purple-border);">
+    <div class="section-head">
+      <div class="dot" style="background:var(--purple);"></div>
+      <h2>Idea Central: Dilated Attention — Atención a Múltiples Escalas</h2>
+      <span class="badge" style="background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-border);">Multi-scale sparse</span>
+    </div>
+    <div class="section-body">
+      <div class="diagram">
+        <svg width="1050" height="430" viewBox="0 0 1050 430">
+          <!-- Title -->
+          <text x="20" y="20" font-size="11" font-weight="700" fill="var(--purple)">En vez de que cada token atienda a TODOS los demás, divide la atención en escalas:</text>
+
+          <!-- ===== ESCALA 1: Local (w=256, r=1) ===== -->
+          <rect x="20" y="35" width="1000" height="100" rx="10" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+          <text x="35" y="55" font-size="10" font-weight="700" fill="var(--green)">Escala 1 — Local: ventana pequeña, sin dilatación</text>
+          <text x="35" y="70" font-size="8" class="mono" fill="var(--text-dim)">segment_length = 256, dilation_rate = 1 (cada token consecutivo)</text>
+
+          <!-- Token sequence with local windows -->
+          <g transform="translate(35, 80)">
+            <!-- Window 1 -->
+            <rect x="0" y="-5" width="170" height="30" rx="4" fill="var(--green)" opacity="0.08" stroke="var(--green)" stroke-width="1" stroke-dasharray="4,2"/>
+            <rect x="0" y="0" width="10" height="18" rx="2" fill="var(--green)" opacity="0.7"/><rect x="13" y="0" width="10" height="18" rx="2" fill="var(--green)" opacity="0.7"/>
+            <rect x="26" y="0" width="10" height="18" rx="2" fill="var(--green)" opacity="0.7"/><rect x="39" y="0" width="10" height="18" rx="2" fill="var(--green)" opacity="0.7"/>
+            <rect x="52" y="0" width="10" height="18" rx="2" fill="var(--green)" opacity="0.7"/><rect x="65" y="0" width="10" height="18" rx="2" fill="var(--green)" opacity="0.5"/>
+            <rect x="78" y="0" width="10" height="18" rx="2" fill="var(--green)" opacity="0.5"/><rect x="91" y="0" width="10" height="18" rx="2" fill="var(--green)" opacity="0.5"/>
+            <text x="108" y="13" font-size="8" fill="var(--green)">···</text>
+            <rect x="125" y="0" width="10" height="18" rx="2" fill="var(--green)" opacity="0.5"/><rect x="138" y="0" width="10" height="18" rx="2" fill="var(--green)" opacity="0.5"/>
+            <rect x="151" y="0" width="10" height="18" rx="2" fill="var(--green)" opacity="0.5"/>
+            <text x="85" y="40" text-anchor="middle" font-size="7" class="mono" fill="var(--green)">ventana de 256</text>
+
+            <!-- Bidirectional arrows inside window -->
+            <path d="M 5 20 Q 42 32 80 20" stroke="var(--green)" stroke-width="0.6" fill="none" opacity="0.5"/>
+            <path d="M 30 20 Q 70 30 110 20" stroke="var(--green)" stroke-width="0.6" fill="none" opacity="0.5"/>
+
+            <!-- Window 2 -->
+            <rect x="180" y="-5" width="170" height="30" rx="4" fill="var(--green)" opacity="0.08" stroke="var(--green)" stroke-width="1" stroke-dasharray="4,2"/>
+            <rect x="180" y="0" width="10" height="18" rx="2" fill="var(--green)" opacity="0.5"/><rect x="193" y="0" width="10" height="18" rx="2" fill="var(--green)" opacity="0.5"/>
+            <rect x="206" y="0" width="10" height="18" rx="2" fill="var(--green)" opacity="0.5"/><rect x="219" y="0" width="10" height="18" rx="2" fill="var(--green)" opacity="0.5"/>
+            <text x="240" y="13" font-size="8" fill="var(--green)">···</text>
+            <rect x="255" y="0" width="10" height="18" rx="2" fill="var(--green)" opacity="0.5"/>
+            <text x="265" y="40" text-anchor="middle" font-size="7" class="mono" fill="var(--green)">ventana de 256</text>
+
+            <text x="370" y="13" font-size="12" fill="var(--text-dim)">···</text>
+
+            <!-- Label -->
+            <text x="440" y="8" font-size="9" fill="var(--green)" font-weight="600">Cada token solo atiende a sus ~256 vecinos más cercanos</text>
+            <text x="440" y="23" font-size="8" fill="var(--text-dim)">Captura: texturas locales, morfología celular, bordes de tejido</text>
+            <text x="440" y="38" font-size="8" class="mono" fill="var(--green)">Costo: N/256 ventanas × 256² = O(N × 256)</text>
+          </g>
+
+          <!-- ===== ESCALA 2: Medium (w=1024, r=4) ===== -->
+          <rect x="20" y="145" width="1000" height="100" rx="10" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="1.5"/>
+          <text x="35" y="165" font-size="10" font-weight="700" fill="var(--blue)">Escala 2 — Media: ventana grande, dilatación moderada</text>
+          <text x="35" y="180" font-size="8" class="mono" fill="var(--text-dim)">segment_length = 1024, dilation_rate = 4 (toma 1 de cada 4 tokens)</text>
+
+          <g transform="translate(35, 190)">
+            <!-- Dilated tokens: big gaps -->
+            <rect x="0" y="0" width="10" height="18" rx="2" fill="var(--blue)" opacity="0.8"/>
+            <!-- gap -->
+            <rect x="13" y="0" width="10" height="18" rx="2" fill="var(--blue)" opacity="0.1"/>
+            <rect x="26" y="0" width="10" height="18" rx="2" fill="var(--blue)" opacity="0.1"/>
+            <rect x="39" y="0" width="10" height="18" rx="2" fill="var(--blue)" opacity="0.1"/>
+            <!-- attend -->
+            <rect x="52" y="0" width="10" height="18" rx="2" fill="var(--blue)" opacity="0.8"/>
+            <!-- gap -->
+            <rect x="65" y="0" width="10" height="18" rx="2" fill="var(--blue)" opacity="0.1"/>
+            <rect x="78" y="0" width="10" height="18" rx="2" fill="var(--blue)" opacity="0.1"/>
+            <rect x="91" y="0" width="10" height="18" rx="2" fill="var(--blue)" opacity="0.1"/>
+            <!-- attend -->
+            <rect x="104" y="0" width="10" height="18" rx="2" fill="var(--blue)" opacity="0.8"/>
+            <!-- gap -->
+            <rect x="117" y="0" width="10" height="18" rx="2" fill="var(--blue)" opacity="0.1"/>
+            <text x="138" y="13" font-size="8" fill="var(--blue)">···</text>
+            <rect x="155" y="0" width="10" height="18" rx="2" fill="var(--blue)" opacity="0.8"/>
+
+            <!-- Arcs showing dilated connections -->
+            <path d="M 5 20 Q 28 35 57 20" stroke="var(--blue)" stroke-width="1" fill="none" opacity="0.5"/>
+            <path d="M 57 20 Q 80 35 109 20" stroke="var(--blue)" stroke-width="1" fill="none" opacity="0.5"/>
+            <path d="M 5 20 Q 55 40 109 20" stroke="var(--blue)" stroke-width="0.7" fill="none" opacity="0.3" stroke-dasharray="3,2"/>
+
+            <!-- r=4 annotation -->
+            <line x1="5" y1="-6" x2="57" y2="-6" stroke="var(--blue)" stroke-width="0.8"/>
+            <text x="31" y="-9" text-anchor="middle" font-size="6" class="mono" fill="var(--blue)">salto de 4</text>
+
+            <!-- Label -->
+            <text x="440" y="8" font-size="9" fill="var(--blue)" font-weight="600">Cada token atiende a 1 de cada 4, cubriendo rango 4× más amplio</text>
+            <text x="440" y="23" font-size="8" fill="var(--text-dim)">Captura: patrones regionales, agrupaciones de tejido, bordes tumor/estroma</text>
+            <text x="440" y="38" font-size="8" class="mono" fill="var(--blue)">Costo: N/1024 ventanas × (1024/4)² = O(N × 64) mucho menor</text>
+          </g>
+
+          <!-- ===== ESCALA 3: Global (w=4096+, r=16+) ===== -->
+          <rect x="20" y="255" width="1000" height="100" rx="10" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+          <text x="35" y="275" font-size="10" font-weight="700" fill="var(--orange)">Escala 3 — Global: ventana enorme, alta dilatación</text>
+          <text x="35" y="290" font-size="8" class="mono" fill="var(--text-dim)">segment_length = 4096+, dilation_rate = 16+ (toma 1 de cada 16 tokens)</text>
+
+          <g transform="translate(35, 300)">
+            <!-- Very sparse tokens -->
+            <rect x="0" y="0" width="10" height="18" rx="2" fill="var(--orange)" opacity="0.8"/>
+            <rect x="13" y="0" width="10" height="18" rx="2" fill="var(--orange)" opacity="0.05"/>
+            <rect x="26" y="0" width="10" height="18" rx="2" fill="var(--orange)" opacity="0.05"/>
+            <text x="45" y="13" font-size="6" fill="var(--text-dim)">···</text>
+            <rect x="60" y="0" width="10" height="18" rx="2" fill="var(--orange)" opacity="0.05"/>
+            <rect x="73" y="0" width="10" height="18" rx="2" fill="var(--orange)" opacity="0.05"/>
+            <text x="95" y="13" font-size="6" fill="var(--text-dim)">···</text>
+            <rect x="115" y="0" width="10" height="18" rx="2" fill="var(--orange)" opacity="0.05"/>
+            <text x="140" y="13" font-size="6" fill="var(--text-dim)">···</text>
+            <rect x="160" y="0" width="10" height="18" rx="2" fill="var(--orange)" opacity="0.8"/>
+            <text x="185" y="13" font-size="6" fill="var(--text-dim)">···(muchos saltos)···</text>
+            <rect x="300" y="0" width="10" height="18" rx="2" fill="var(--orange)" opacity="0.8"/>
+
+            <!-- Wide arc -->
+            <path d="M 5 20 Q 85 50 165 20" stroke="var(--orange)" stroke-width="1.2" fill="none" opacity="0.4"/>
+            <path d="M 5 20 Q 155 60 305 20" stroke="var(--orange)" stroke-width="0.8" fill="none" opacity="0.3" stroke-dasharray="4,3"/>
+
+            <!-- Label -->
+            <text x="440" y="8" font-size="9" fill="var(--orange)" font-weight="600">Cada token ve una muestra dispersa del slide ENTERO</text>
+            <text x="440" y="23" font-size="8" fill="var(--text-dim)">Captura: composición global, distribución tumor/normal, staging</text>
+            <text x="440" y="38" font-size="8" class="mono" fill="var(--orange)">Costo: proporcional pero muy eficiente por la alta dilatación</text>
+          </g>
+
+          <!-- ===== COMBINATION ===== -->
+          <rect x="20" y="368" width="1000" height="52" rx="10" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="2"/>
+          <text x="525" y="392" text-anchor="middle" font-size="11" font-weight="700" fill="var(--purple)">Las 3 escalas se combinan → cada token obtiene contexto local + regional + global simultáneamente</text>
+          <text x="525" y="410" text-anchor="middle" font-size="9" class="mono" fill="var(--purple)">output = α₁·Attn(w=256,r=1) + α₂·Attn(w=1024,r=4) + α₃·Attn(w=4096,r=16)    αᵢ = pesos dinámicos</text>
+        </svg>
+      </div>
+      <div class="note note-purple">
+        <strong>Intuición clave:</strong> Es como ver un slide de patología con múltiples aumentos simultáneamente. La escala local es como mirar a 40× (detalle celular), la media es como 10× (arquitectura tisular), y la global es como la vista thumbnail (composición general). LongNet fusiona estas tres "resoluciones de atención" en una sola operación.
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-connector">
+    <div class="arrow"></div>
+    <span class="dim-label">Dilated Attention reemplaza Self-Attention estándar</span>
+  </div>
+
+  <!-- ==================== MECANISMO DETALLADO ==================== -->
+  <div class="section" style="border-color:var(--teal-border);">
+    <div class="section-head">
+      <div class="dot" style="background:var(--teal);"></div>
+      <h2>Mecanismo: Cómo funciona la Dilated Attention paso a paso</h2>
+      <span class="badge" style="background:var(--teal-bg);color:var(--teal);border:1px solid var(--teal-border);">Gather → Attn → Scatter</span>
+    </div>
+    <div class="section-body">
+      <div class="diagram">
+        <svg width="1050" height="380" viewBox="0 0 1050 380">
+          <!-- Step labels -->
+          <text x="20" y="20" font-size="10" font-weight="700" fill="var(--teal)">Para una escala con segment_length=8 y dilation_rate=2 (ejemplo simplificado):</text>
+
+          <!-- Input sequence: 16 tokens -->
+          <text x="20" y="45" font-size="9" font-weight="600" fill="var(--text)">Secuencia original (16 tokens):</text>
+          <g transform="translate(20, 55)">
+            <rect x="0" y="0" width="28" height="22" rx="3" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="1"/>
+            <text x="14" y="15" text-anchor="middle" font-size="7" class="mono" fill="var(--blue)">t₀</text>
+            <rect x="32" y="0" width="28" height="22" rx="3" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1"/>
+            <text x="46" y="15" text-anchor="middle" font-size="7" class="mono" fill="var(--orange)">t₁</text>
+            <rect x="64" y="0" width="28" height="22" rx="3" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="1"/>
+            <text x="78" y="15" text-anchor="middle" font-size="7" class="mono" fill="var(--blue)">t₂</text>
+            <rect x="96" y="0" width="28" height="22" rx="3" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1"/>
+            <text x="110" y="15" text-anchor="middle" font-size="7" class="mono" fill="var(--orange)">t₃</text>
+            <rect x="128" y="0" width="28" height="22" rx="3" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="1"/>
+            <text x="142" y="15" text-anchor="middle" font-size="7" class="mono" fill="var(--blue)">t₄</text>
+            <rect x="160" y="0" width="28" height="22" rx="3" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1"/>
+            <text x="174" y="15" text-anchor="middle" font-size="7" class="mono" fill="var(--orange)">t₅</text>
+            <rect x="192" y="0" width="28" height="22" rx="3" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="1"/>
+            <text x="206" y="15" text-anchor="middle" font-size="7" class="mono" fill="var(--blue)">t₆</text>
+            <rect x="224" y="0" width="28" height="22" rx="3" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1"/>
+            <text x="238" y="15" text-anchor="middle" font-size="7" class="mono" fill="var(--orange)">t₇</text>
+            <rect x="266" y="0" width="28" height="22" rx="3" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="1"/>
+            <text x="280" y="15" text-anchor="middle" font-size="7" class="mono" fill="var(--blue)">t₈</text>
+            <rect x="298" y="0" width="28" height="22" rx="3" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1"/>
+            <text x="312" y="15" text-anchor="middle" font-size="7" class="mono" fill="var(--orange)">t₉</text>
+            <rect x="330" y="0" width="28" height="22" rx="3" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="1"/>
+            <text x="344" y="15" text-anchor="middle" font-size="7" class="mono" fill="var(--blue)">t₁₀</text>
+            <rect x="362" y="0" width="28" height="22" rx="3" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1"/>
+            <text x="376" y="15" text-anchor="middle" font-size="7" class="mono" fill="var(--orange)">t₁₁</text>
+            <rect x="394" y="0" width="28" height="22" rx="3" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="1"/>
+            <text x="408" y="15" text-anchor="middle" font-size="7" class="mono" fill="var(--blue)">t₁₂</text>
+            <rect x="426" y="0" width="28" height="22" rx="3" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1"/>
+            <text x="440" y="15" text-anchor="middle" font-size="7" class="mono" fill="var(--orange)">t₁₃</text>
+            <rect x="458" y="0" width="28" height="22" rx="3" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="1"/>
+            <text x="472" y="15" text-anchor="middle" font-size="7" class="mono" fill="var(--blue)">t₁₄</text>
+            <rect x="490" y="0" width="28" height="22" rx="3" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1"/>
+            <text x="504" y="15" text-anchor="middle" font-size="7" class="mono" fill="var(--orange)">t₁₅</text>
+          </g>
+          <text x="545" y="70" font-size="8" class="mono" fill="var(--text-dim)">colores = grupo par/impar</text>
+
+          <!-- STEP 1: GATHER (split by dilation) -->
+          <text x="20" y="105" font-size="10" font-weight="700" fill="var(--teal)">❶ GATHER — Separar por dilation_rate=2 (pares vs impares):</text>
+
+          <!-- Group A: even indices -->
+          <g transform="translate(20, 115)">
+            <rect x="0" y="-5" width="285" height="32" rx="5" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="1.2"/>
+            <text x="5" y="-10" font-size="7" font-weight="700" fill="var(--blue)">Grupo A (índices pares)</text>
+            <rect x="5" y="2" width="28" height="18" rx="2" fill="var(--blue)" opacity="0.3"/>
+            <text x="19" y="14" text-anchor="middle" font-size="6" class="mono" fill="var(--blue)">t₀</text>
+            <rect x="37" y="2" width="28" height="18" rx="2" fill="var(--blue)" opacity="0.3"/>
+            <text x="51" y="14" text-anchor="middle" font-size="6" class="mono" fill="var(--blue)">t₂</text>
+            <rect x="69" y="2" width="28" height="18" rx="2" fill="var(--blue)" opacity="0.3"/>
+            <text x="83" y="14" text-anchor="middle" font-size="6" class="mono" fill="var(--blue)">t₄</text>
+            <rect x="101" y="2" width="28" height="18" rx="2" fill="var(--blue)" opacity="0.3"/>
+            <text x="115" y="14" text-anchor="middle" font-size="6" class="mono" fill="var(--blue)">t₆</text>
+            <rect x="133" y="2" width="28" height="18" rx="2" fill="var(--blue)" opacity="0.3"/>
+            <text x="147" y="14" text-anchor="middle" font-size="6" class="mono" fill="var(--blue)">t₈</text>
+            <rect x="165" y="2" width="28" height="18" rx="2" fill="var(--blue)" opacity="0.3"/>
+            <text x="179" y="14" text-anchor="middle" font-size="6" class="mono" fill="var(--blue)">t₁₀</text>
+            <rect x="197" y="2" width="28" height="18" rx="2" fill="var(--blue)" opacity="0.3"/>
+            <text x="211" y="14" text-anchor="middle" font-size="6" class="mono" fill="var(--blue)">t₁₂</text>
+            <rect x="229" y="2" width="28" height="18" rx="2" fill="var(--blue)" opacity="0.3"/>
+            <text x="243" y="14" text-anchor="middle" font-size="6" class="mono" fill="var(--blue)">t₁₄</text>
+          </g>
+
+          <!-- Group B: odd indices -->
+          <g transform="translate(20, 155)">
+            <rect x="0" y="-5" width="285" height="32" rx="5" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.2"/>
+            <text x="5" y="-10" font-size="7" font-weight="700" fill="var(--orange)">Grupo B (índices impares)</text>
+            <rect x="5" y="2" width="28" height="18" rx="2" fill="var(--orange)" opacity="0.3"/>
+            <text x="19" y="14" text-anchor="middle" font-size="6" class="mono" fill="var(--orange)">t₁</text>
+            <rect x="37" y="2" width="28" height="18" rx="2" fill="var(--orange)" opacity="0.3"/>
+            <text x="51" y="14" text-anchor="middle" font-size="6" class="mono" fill="var(--orange)">t₃</text>
+            <rect x="69" y="2" width="28" height="18" rx="2" fill="var(--orange)" opacity="0.3"/>
+            <text x="83" y="14" text-anchor="middle" font-size="6" class="mono" fill="var(--orange)">t₅</text>
+            <rect x="101" y="2" width="28" height="18" rx="2" fill="var(--orange)" opacity="0.3"/>
+            <text x="115" y="14" text-anchor="middle" font-size="6" class="mono" fill="var(--orange)">t₇</text>
+            <rect x="133" y="2" width="28" height="18" rx="2" fill="var(--orange)" opacity="0.3"/>
+            <text x="147" y="14" text-anchor="middle" font-size="6" class="mono" fill="var(--orange)">t₉</text>
+            <rect x="165" y="2" width="28" height="18" rx="2" fill="var(--orange)" opacity="0.3"/>
+            <text x="179" y="14" text-anchor="middle" font-size="6" class="mono" fill="var(--orange)">t₁₁</text>
+            <rect x="197" y="2" width="28" height="18" rx="2" fill="var(--orange)" opacity="0.3"/>
+            <text x="211" y="14" text-anchor="middle" font-size="6" class="mono" fill="var(--orange)">t₁₃</text>
+            <rect x="229" y="2" width="28" height="18" rx="2" fill="var(--orange)" opacity="0.3"/>
+            <text x="243" y="14" text-anchor="middle" font-size="6" class="mono" fill="var(--orange)">t₁₅</text>
+          </g>
+
+          <!-- Annotation for Gather -->
+          <rect x="330" y="115" width="320" height="68" rx="8" fill="white" stroke="var(--teal)" stroke-width="1"/>
+          <text x="345" y="135" font-size="9" fill="var(--text)">dilation_rate = 2 → separa en <tspan font-weight="700">2 sub-secuencias</tspan></text>
+          <text x="345" y="152" font-size="9" fill="var(--text)">Cada grupo tiene N/2 = 8 tokens</text>
+          <text x="345" y="169" font-size="8" fill="var(--text-dim)">Los tokens dentro de cada grupo son "vecinos dilatados"</text>
+          <text x="345" y="180" font-size="8" fill="var(--text-dim)">(estaban separados por 2 posiciones en la secuencia original)</text>
+
+          <!-- STEP 2: SEGMENT + ATTENTION -->
+          <text x="20" y="210" font-size="10" font-weight="700" fill="var(--teal)">❷ SEGMENT — Dividir cada grupo en segmentos, luego ATTENTION dentro de cada segmento:</text>
+
+          <!-- Group A segments -->
+          <g transform="translate(20, 222)">
+            <rect x="0" y="0" width="140" height="50" rx="6" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="1.5"/>
+            <text x="70" y="15" text-anchor="middle" font-size="7" font-weight="600" fill="var(--blue)">Segmento A₁ (4 tokens)</text>
+            <rect x="8" y="22" width="22" height="14" rx="2" fill="var(--blue)" opacity="0.4"/>
+            <text x="19" y="33" text-anchor="middle" font-size="6" class="mono" fill="white">t₀</text>
+            <rect x="34" y="22" width="22" height="14" rx="2" fill="var(--blue)" opacity="0.4"/>
+            <text x="45" y="33" text-anchor="middle" font-size="6" class="mono" fill="white">t₂</text>
+            <rect x="60" y="22" width="22" height="14" rx="2" fill="var(--blue)" opacity="0.4"/>
+            <text x="71" y="33" text-anchor="middle" font-size="6" class="mono" fill="white">t₄</text>
+            <rect x="86" y="22" width="22" height="14" rx="2" fill="var(--blue)" opacity="0.4"/>
+            <text x="97" y="33" text-anchor="middle" font-size="6" class="mono" fill="white">t₆</text>
+            <!-- Mini attention arrows -->
+            <path d="M 19 38 Q 45 48 71 38" stroke="var(--blue)" stroke-width="0.6" fill="none"/>
+            <path d="M 45 38 Q 58 45 71 38" stroke="var(--blue)" stroke-width="0.6" fill="none"/>
+
+            <rect x="150" y="0" width="140" height="50" rx="6" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="1.5"/>
+            <text x="220" y="15" text-anchor="middle" font-size="7" font-weight="600" fill="var(--blue)">Segmento A₂ (4 tokens)</text>
+            <rect x="158" y="22" width="22" height="14" rx="2" fill="var(--blue)" opacity="0.4"/>
+            <text x="169" y="33" text-anchor="middle" font-size="6" class="mono" fill="white">t₈</text>
+            <rect x="184" y="22" width="22" height="14" rx="2" fill="var(--blue)" opacity="0.4"/>
+            <text x="195" y="33" text-anchor="middle" font-size="6" class="mono" fill="white">t₁₀</text>
+            <rect x="210" y="22" width="22" height="14" rx="2" fill="var(--blue)" opacity="0.4"/>
+            <text x="221" y="33" text-anchor="middle" font-size="6" class="mono" fill="white">t₁₂</text>
+            <rect x="236" y="22" width="22" height="14" rx="2" fill="var(--blue)" opacity="0.4"/>
+            <text x="247" y="33" text-anchor="middle" font-size="6" class="mono" fill="white">t₁₄</text>
+          </g>
+
+          <!-- Annotation -->
+          <rect x="330" y="222" width="320" height="50" rx="8" fill="white" stroke="var(--teal)" stroke-width="1"/>
+          <text x="345" y="243" font-size="9" fill="var(--text)">Self-attention <tspan font-weight="700">dentro</tspan> de cada segmento</text>
+          <text x="345" y="260" font-size="8" fill="var(--text-dim)">Solo 4×4 = 16 operaciones por segmento (no 16×16 = 256)</text>
+
+          <!-- Note: segment_length / dilation_rate = effective window -->
+          <text x="700" y="243" font-size="8" class="mono" fill="var(--teal)">attn = 4×4 matrix</text>
+          <text x="700" y="258" font-size="8" class="mono" fill="var(--teal)">(segment/rate = 8/2 = 4)</text>
+
+          <!-- STEP 3: SCATTER back -->
+          <text x="20" y="300" font-size="10" font-weight="700" fill="var(--teal)">❸ SCATTER — Devolver tokens enriquecidos a sus posiciones originales:</text>
+
+          <g transform="translate(20, 312)">
+            <rect x="0" y="0" width="28" height="22" rx="3" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+            <text x="14" y="15" text-anchor="middle" font-size="7" class="mono" font-weight="600" fill="var(--purple)">t₀'</text>
+            <rect x="32" y="0" width="28" height="22" rx="3" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+            <text x="46" y="15" text-anchor="middle" font-size="7" class="mono" font-weight="600" fill="var(--purple)">t₁'</text>
+            <rect x="64" y="0" width="28" height="22" rx="3" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+            <text x="78" y="15" text-anchor="middle" font-size="7" class="mono" font-weight="600" fill="var(--purple)">t₂'</text>
+            <text x="100" y="15" font-size="8" fill="var(--text-dim)">···</text>
+            <rect x="115" y="0" width="28" height="22" rx="3" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+            <text x="129" y="15" text-anchor="middle" font-size="7" class="mono" font-weight="600" fill="var(--purple)">t₁₅'</text>
+
+            <text x="165" y="15" font-size="9" fill="var(--purple)" font-weight="600">← tokens con contexto dilatado</text>
+          </g>
+
+          <!-- Final note -->
+          <rect x="20" y="348" width="630" height="28" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1"/>
+          <text x="35" y="367" font-size="9" fill="var(--teal)"><tspan font-weight="700">Esto se hace en paralelo</tspan> para cada escala (local, media, global). Los resultados se combinan con pesos dinámicos.</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-connector">
+    <div class="arrow"></div>
+    <span class="dim-label">Multi-scale dilated attention outputs combinados</span>
+  </div>
+
+  <!-- ==================== ARQUITECTURA COMPLETA DEL BLOQUE ==================== -->
+  <div class="section" style="border-color:var(--blue-border);">
+    <div class="section-head">
+      <div class="dot" style="background:var(--blue);"></div>
+      <h2>Arquitectura del Bloque LongNet Transformer (estimada para SlideChat)</h2>
+      <span class="badge" style="background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border);">Encoder-only</span>
+    </div>
+    <div class="section-body">
+      <div class="diagram">
+        <svg width="1050" height="200" viewBox="0 0 1050 200">
+          <!-- Input -->
+          <rect x="10" y="75" width="75" height="45" rx="6" fill="var(--surface2)" stroke="var(--border)" stroke-width="1.2"/>
+          <text x="48" y="95" text-anchor="middle" font-size="9" font-weight="600" fill="var(--text)">Input</text>
+          <text x="48" y="110" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">N × 512</text>
+
+          <line x1="90" y1="97" x2="115" y2="97" stroke="var(--purple)" stroke-width="1.2" marker-end="url(#a-purple)"/>
+
+          <!-- LayerNorm 1 -->
+          <rect x="122" y="80" width="50" height="35" rx="5" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.2"/>
+          <text x="147" y="100" text-anchor="middle" font-size="8" font-weight="600" fill="var(--purple)">LN</text>
+
+          <line x1="177" y1="97" x2="200" y2="97" stroke="var(--purple)" stroke-width="1.2" marker-end="url(#a-purple)"/>
+
+          <!-- Dilated MHSA -->
+          <rect x="207" y="60" width="170" height="75" rx="8" fill="var(--green-bg)" stroke="var(--green)" stroke-width="2"/>
+          <text x="292" y="82" text-anchor="middle" font-size="10" font-weight="700" fill="var(--green)">Dilated MHSA</text>
+          <text x="292" y="98" text-anchor="middle" font-size="7" class="mono" fill="var(--green)">Multi-scale sparse attention</text>
+          <text x="292" y="112" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">8 heads × 64 dim/head</text>
+          <text x="292" y="126" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">seg=[256,1024,4096] r=[1,4,16]</text>
+
+          <line x1="382" y1="97" x2="405" y2="97" stroke="var(--green)" stroke-width="1.2"/>
+
+          <!-- Residual 1 -->
+          <circle cx="418" cy="97" r="12" fill="white" stroke="var(--text)" stroke-width="1.5"/>
+          <text x="418" y="101" text-anchor="middle" font-size="12" font-weight="700" fill="var(--text)">+</text>
+          <path d="M 48 125 L 48 160 L 418 160 L 418 112" stroke="var(--text-dim)" stroke-width="0.8" fill="none" stroke-dasharray="4,3"/>
+          <text x="230" y="170" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">residual skip</text>
+
+          <line x1="433" y1="97" x2="455" y2="97" stroke="var(--text)" stroke-width="1.2" marker-end="url(#a-dim)"/>
+
+          <!-- LayerNorm 2 -->
+          <rect x="462" y="80" width="50" height="35" rx="5" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.2"/>
+          <text x="487" y="100" text-anchor="middle" font-size="8" font-weight="600" fill="var(--purple)">LN</text>
+
+          <line x1="517" y1="97" x2="540" y2="97" stroke="var(--orange)" stroke-width="1.2" marker-end="url(#a-orange)"/>
+
+          <!-- FFN -->
+          <rect x="547" y="65" width="145" height="65" rx="8" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="2"/>
+          <text x="620" y="85" text-anchor="middle" font-size="10" font-weight="700" fill="var(--orange)">FFN</text>
+          <text x="620" y="100" text-anchor="middle" font-size="7" class="mono" fill="var(--orange)">512 → 2048 → 512</text>
+          <text x="620" y="115" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">GELU / SwiGLU</text>
+
+          <line x1="697" y1="97" x2="720" y2="97" stroke="var(--orange)" stroke-width="1.2"/>
+
+          <!-- Residual 2 -->
+          <circle cx="733" cy="97" r="12" fill="white" stroke="var(--text)" stroke-width="1.5"/>
+          <text x="733" y="101" text-anchor="middle" font-size="12" font-weight="700" fill="var(--text)">+</text>
+          <path d="M 418 82 L 418 40 L 733 40 L 733 82" stroke="var(--text-dim)" stroke-width="0.8" fill="none" stroke-dasharray="4,3"/>
+
+          <line x1="748" y1="97" x2="775" y2="97" stroke="var(--text)" stroke-width="1.5" marker-end="url(#a-dim)"/>
+
+          <!-- Output -->
+          <rect x="782" y="75" width="80" height="45" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+          <text x="822" y="95" text-anchor="middle" font-size="9" font-weight="700" fill="var(--purple)">Output</text>
+          <text x="822" y="110" text-anchor="middle" font-size="7" class="mono" fill="var(--purple)">N × 512</text>
+
+          <!-- Repeat indicator -->
+          <rect x="890" y="80" width="120" height="35" rx="6" fill="var(--surface2)" stroke="var(--border)" stroke-width="1" stroke-dasharray="4,3"/>
+          <text x="950" y="95" text-anchor="middle" font-size="8" font-weight="600" fill="var(--text-dim)">× L bloques</text>
+          <text x="950" y="108" text-anchor="middle" font-size="7" class="mono" fill="var(--text-dim)">L = profundidad</text>
+        </svg>
+      </div>
+
+      <div class="info-row">
+        <div class="info-cell"><div class="lbl">Input dim (d_model)</div><div class="val" style="color:var(--blue)">512</div></div>
+        <div class="info-cell"><div class="lbl">Attention Heads</div><div class="val" style="color:var(--green)">8</div></div>
+        <div class="info-cell"><div class="lbl">Head dim</div><div class="val" style="color:var(--green)">512/8 = 64</div></div>
+        <div class="info-cell"><div class="lbl">FFN dim (4×)</div><div class="val" style="color:var(--orange)">2048</div></div>
+        <div class="info-cell"><div class="lbl">Complejidad</div><div class="val" style="color:var(--purple)">O(N·log N)</div></div>
+        <div class="info-cell"><div class="lbl">Estado</div><div class="val" style="color:var(--green)">⚡ Trainable</div></div>
+      </div>
+
+      <div class="note note-blue">
+        <strong>Nota sobre la configuración exacta:</strong> El paper de SlideChat no publica los hiperparámetros internos exactos del LongNet (profundidad, segment_lengths específicos). Los valores mostrados arriba son estimaciones razonables basadas en la referencia al paper de LongNet y Prov-GigaPath [31], que usa configuraciones similares con d_model=512 para pathology. La configuración por defecto de LongNet usa segment_lengths=[2048, 4096, 8192, 16384, 32768] con dilation_rates=[1, 2, 4, 6, 12].
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-connector">
+    <div class="arrow"></div>
+    <span class="dim-label">Output: N × 512 (misma forma, enriquecido con contexto global)</span>
+  </div>
+
+  <!-- ==================== QUÉ CAMBIA EN LOS TOKENS ==================== -->
+  <div class="section" style="border-color:var(--green-border);">
+    <div class="section-head">
+      <div class="dot" style="background:var(--green);"></div>
+      <h2>Antes vs Después: ¿Qué gana cada token al pasar por LongNet?</h2>
+      <span class="badge" style="background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);">Contexto slide-level</span>
+    </div>
+    <div class="section-body">
+      <div class="vs-grid">
+        <div class="vs-card" style="border-color:var(--red-border);background:var(--red-bg);">
+          <h4 style="color:var(--red);">❌ ANTES de LongNet (salida de CONCH)</h4>
+          <p>Cada parche es un embedding de 512-dim que <strong>solo sabe de sí mismo</strong>.</p>
+          <p style="margin-top:8px;">Parche #3,472: "Soy tejido con atipia nuclear y figuras mitóticas"</p>
+          <p style="margin-top:4px;">Parche #8,201: "Soy estroma con deposición de colágeno"</p>
+          <p style="margin-top:8px;font-size:0.72rem;color:var(--red);">No hay comunicación entre parches. Cada uno es una isla.</p>
+        </div>
+        <div class="vs-card" style="border-color:var(--green-border);background:var(--green-bg);">
+          <h4 style="color:var(--green);">✓ DESPUÉS de LongNet (embeddings enriquecidos)</h4>
+          <p>Cada parche ahora contiene <strong>información contextual del slide entero</strong>.</p>
+          <p style="margin-top:8px;">Parche #3,472: "Soy atipia en una región rodeada de tejido normal, cerca del borde invasivo, en un slide con ~40% tumor"</p>
+          <p style="margin-top:4px;">Parche #8,201: "Soy estroma en la periferia del tumor, lejos del centro necrótico"</p>
+          <p style="margin-top:8px;font-size:0.72rem;color:var(--green);">Cada token sabe su rol dentro del slide completo.</p>
+        </div>
+      </div>
+
+      <div class="note note-green" style="margin-top:16px;">
+        <strong>Evidencia empírica:</strong> Sin LongNet, la performance en datos fuera de distribución (BCNB) cae >10%. Esto demuestra que el contexto global es esencial para generalización: no basta con ver parches aislados, se necesita entender la composición espacial del slide completo para staging, grading, y clasificación de subtipos.
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-connector">
+    <div class="arrow"></div>
+    <span class="dim-label">N × 512 → Módulo 3 (Projector) → Módulo 4 (LLM)</span>
+  </div>
+
+  <!-- ==================== RESUMEN DE PIPELINE ==================== -->
+  <div class="section" style="border-color:var(--purple-border);">
+    <div class="section-head">
+      <div class="dot" style="background:var(--purple);"></div>
+      <h2>Pipeline completo hasta aquí</h2>
+      <span class="badge" style="background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-border);">Módulos 1 + 2</span>
+    </div>
+    <div class="section-body">
+      <div class="diagram">
+        <svg width="1050" height="115" viewBox="0 0 1050 115">
+          <!-- WSI -->
+          <rect x="5" y="30" width="80" height="50" rx="6" fill="var(--surface2)" stroke="var(--border)" stroke-width="1.2"/>
+          <text x="45" y="52" text-anchor="middle" font-size="8" font-weight="600" fill="var(--text)">WSI</text>
+          <text x="45" y="66" text-anchor="middle" font-size="6" class="mono" fill="var(--text-dim)">100K×100K px</text>
+          <line x1="90" y1="55" x2="108" y2="55" stroke="var(--text-dim)" stroke-width="1" marker-end="url(#a-dim)"/>
+
+          <!-- Patching -->
+          <rect x="115" y="35" width="70" height="40" rx="5" fill="var(--surface2)" stroke="var(--border)" stroke-width="1"/>
+          <text x="150" y="53" text-anchor="middle" font-size="7" font-weight="600" fill="var(--text)">Patchify</text>
+          <text x="150" y="65" text-anchor="middle" font-size="6" class="mono" fill="var(--text-dim)">224×224</text>
+          <line x1="190" y1="55" x2="208" y2="55" stroke="var(--text-dim)" stroke-width="1" marker-end="url(#a-dim)"/>
+          <text x="199" y="43" font-size="6" class="mono" fill="var(--text-dim)">N patches</text>
+
+          <!-- CONCH -->
+          <rect x="215" y="25" width="130" height="60" rx="8" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="2"/>
+          <text x="280" y="48" text-anchor="middle" font-size="10" font-weight="700" fill="var(--blue)">CONCH</text>
+          <text x="280" y="63" text-anchor="middle" font-size="7" class="mono" fill="var(--blue)">ViT-B/16 🧊 frozen</text>
+          <text x="280" y="76" text-anchor="middle" font-size="6" class="mono" fill="var(--text-dim)">224×224→512-dim per patch</text>
+          <line x1="350" y1="55" x2="380" y2="55" stroke="var(--blue)" stroke-width="1.5" marker-end="url(#a-blue)"/>
+          <text x="365" y="43" font-size="6" class="mono" fill="var(--blue)">N×512</text>
+
+          <!-- LongNet -->
+          <rect x="387" y="25" width="150" height="60" rx="8" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="2"/>
+          <text x="462" y="48" text-anchor="middle" font-size="10" font-weight="700" fill="var(--purple)">LongNet</text>
+          <text x="462" y="63" text-anchor="middle" font-size="7" class="mono" fill="var(--purple)">Dilated Attn ⚡ trainable</text>
+          <text x="462" y="76" text-anchor="middle" font-size="6" class="mono" fill="var(--text-dim)">contexto local+global</text>
+          <line x1="542" y1="55" x2="572" y2="55" stroke="var(--purple)" stroke-width="1.5" marker-end="url(#a-purple)"/>
+          <text x="557" y="43" font-size="6" class="mono" fill="var(--purple)">N×512</text>
+
+          <!-- Projector (next) -->
+          <rect x="580" y="30" width="100" height="50" rx="6" fill="var(--surface2)" stroke="var(--border)" stroke-width="1" stroke-dasharray="5,3"/>
+          <text x="630" y="52" text-anchor="middle" font-size="8" font-weight="600" fill="var(--text-dim)">Projector</text>
+          <text x="630" y="66" text-anchor="middle" font-size="6" class="mono" fill="var(--text-dim)">512 → LLM dim</text>
+          <line x1="685" y1="55" x2="715" y2="55" stroke="var(--text-dim)" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a-dim)"/>
+
+          <!-- LLM (next) -->
+          <rect x="722" y="30" width="100" height="50" rx="6" fill="var(--surface2)" stroke="var(--border)" stroke-width="1" stroke-dasharray="5,3"/>
+          <text x="772" y="52" text-anchor="middle" font-size="8" font-weight="600" fill="var(--text-dim)">Qwen2.5-7B</text>
+          <text x="772" y="66" text-anchor="middle" font-size="6" class="mono" fill="var(--text-dim)">→ respuesta</text>
+
+          <!-- Current position indicator -->
+          <rect x="387" y="95" width="150" height="16" rx="4" fill="var(--purple)"/>
+          <text x="462" y="106" text-anchor="middle" font-size="7" font-weight="700" fill="white">ESTAMOS AQUÍ ★</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
