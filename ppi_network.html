@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InteractomeViz — PPI & Pathway Explorer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=JetBrains+Mono:wght@300;400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-primary: #0a0e17;
+    --bg-secondary: #111827;
+    --bg-panel: #151d2e;
+    --bg-hover: #1e293b;
+    --border: #1e293b;
+    --border-active: #334155;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent-blue: #3b82f6;
+    --accent-cyan: #06b6d4;
+    --accent-emerald: #10b981;
+    --accent-amber: #f59e0b;
+    --accent-rose: #f43f5e;
+    --accent-violet: #8b5cf6;
+    --accent-orange: #f97316;
+    --accent-pink: #ec4899;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  #app {
+    display: grid;
+    grid-template-columns: 300px 1fr 320px;
+    grid-template-rows: 56px 1fr;
+    height: 100vh;
+    gap: 0;
+  }
+
+  /* ── Header ── */
+  header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-mark {
+    width: 28px;
+    height: 28px;
+    background: conic-gradient(from 0deg, var(--accent-cyan), var(--accent-blue), var(--accent-violet), var(--accent-cyan));
+    border-radius: 7px;
+    position: relative;
+  }
+
+  .logo-mark::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+  }
+
+  .logo h1 {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+  }
+
+  .logo h1 span {
+    color: var(--text-muted);
+    font-weight: 300;
+    margin-left: 6px;
+    font-size: 12px;
+  }
+
+  .header-stats {
+    display: flex;
+    gap: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .header-stats .stat-val {
+    color: var(--accent-cyan);
+    margin-left: 4px;
+  }
+
+  .header-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    color: var(--text-secondary);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-active);
+    color: var(--text-primary);
+  }
+
+  .btn.active {
+    background: rgba(59,130,246,0.15);
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+
+  /* ── Left Panel ── */
+  .panel-left {
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-section {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-section-title {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  .search-box {
+    position: relative;
+    margin-bottom: 0;
+  }
+
+  .search-box input {
+    width: 100%;
+    padding: 8px 12px 8px 32px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    outline: none;
+    transition: border 0.2s;
+  }
+
+  .search-box input:focus {
+    border-color: var(--accent-blue);
+  }
+
+  .search-box input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .search-box svg {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+  }
+
+  /* Pathway list */
+  .pathway-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 16px;
+  }
+
+  .pathway-list::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .pathway-list::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .pathway-list::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+  }
+
+  .pathway-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 2px;
+  }
+
+  .pathway-item:hover {
+    background: var(--bg-hover);
+  }
+
+  .pathway-item.active {
+    background: var(--bg-hover);
+  }
+
+  .pathway-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .pathway-label {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pathway-item.active .pathway-label,
+  .pathway-item:hover .pathway-label {
+    color: var(--text-primary);
+  }
+
+  .pathway-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    background: var(--bg-panel);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  /* ── Main Canvas ── */
+  .canvas-area {
+    position: relative;
+    overflow: hidden;
+    background: var(--bg-primary);
+  }
+
+  .canvas-area svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .canvas-bg {
+    fill: var(--bg-primary);
+  }
+
+  /* Grid pattern */
+  .grid-line {
+    stroke: #151d2e;
+    stroke-width: 0.5;
+  }
+
+  /* Links */
+  .link {
+    stroke-linecap: round;
+    transition: opacity 0.3s;
+  }
+
+  .link.dimmed {
+    opacity: 0.04 !important;
+  }
+
+  .link.highlighted {
+    opacity: 1 !important;
+  }
+
+  /* Nodes */
+  .node {
+    cursor: pointer;
+    transition: opacity 0.3s;
+  }
+
+  .node.dimmed {
+    opacity: 0.08 !important;
+  }
+
+  .node.highlighted .node-ring {
+    opacity: 1;
+  }
+
+  .node-circle {
+    stroke-width: 1.5;
+    transition: r 0.2s;
+  }
+
+  .node-ring {
+    fill: none;
+    stroke-width: 2;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .node-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    fill: var(--text-secondary);
+    text-anchor: middle;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .node-label.visible {
+    opacity: 1;
+  }
+
+  .node:hover .node-label,
+  .node.highlighted .node-label {
+    opacity: 1;
+    fill: var(--text-primary);
+  }
+
+  .node:hover .node-circle {
+    filter: brightness(1.3);
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-active);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 12px;
+    max-width: 260px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 200;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    backdrop-filter: blur(12px);
+  }
+
+  .tooltip.visible {
+    opacity: 1;
+  }
+
+  .tooltip-name {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+
+  .tooltip-type {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .tooltip-pathways {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .tooltip-tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(59,130,246,0.12);
+    color: var(--accent-blue);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── Right Panel ── */
+  .panel-right {
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .detail-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    gap: 8px;
+    padding: 40px;
+    text-align: center;
+  }
+
+  .detail-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+  }
+
+  .detail-content::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .detail-content::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+  }
+
+  .detail-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .detail-protein-name {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+  }
+
+  .detail-full-name {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  .detail-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .meta-card {
+    background: var(--bg-panel);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+
+  .meta-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  .meta-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--accent-cyan);
+  }
+
+  .detail-section {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .detail-section-title {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+
+  .interaction-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-bottom: 2px;
+  }
+
+  .interaction-item:hover {
+    background: var(--bg-hover);
+  }
+
+  .interaction-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .interaction-name {
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-secondary);
+  }
+
+  .interaction-evidence {
+    margin-left: auto;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .ev-experimental {
+    background: rgba(16,185,129,0.12);
+    color: var(--accent-emerald);
+  }
+
+  .ev-predicted {
+    background: rgba(245,158,11,0.12);
+    color: var(--accent-amber);
+  }
+
+  .ev-literature {
+    background: rgba(139,92,246,0.12);
+    color: var(--accent-violet);
+  }
+
+  .pathway-tag-detail {
+    display: inline-block;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    margin: 0 4px 4px 0;
+    font-family: 'JetBrains Mono', monospace;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .pathway-tag-detail:hover {
+    filter: brightness(1.3);
+  }
+
+  /* ── Canvas overlay controls ── */
+  .canvas-controls {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 6px;
+    z-index: 50;
+  }
+
+  .canvas-controls .btn {
+    border: none;
+    background: transparent;
+    padding: 6px 10px;
+    font-size: 14px;
+    border-radius: 6px;
+  }
+
+  .canvas-controls .btn:hover {
+    background: var(--bg-hover);
+  }
+
+  .legend-bar {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    display: flex;
+    gap: 12px;
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    z-index: 50;
+    background: rgba(17,24,39,0.8);
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .legend-line {
+    width: 16px;
+    height: 2px;
+    border-radius: 1px;
+  }
+
+  /* Glow effect for selected */
+  .glow {
+    filter: drop-shadow(0 0 6px currentColor);
+  }
+
+  /* Fade animation */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-in {
+    animation: fadeIn 0.3s ease forwards;
+  }
+
+  /* Responsive */
+  @media (max-width: 1100px) {
+    #app {
+      grid-template-columns: 250px 1fr 0;
+    }
+    .panel-right {
+      display: none;
+    }
+  }
+
+  @media (max-width: 768px) {
+    #app {
+      grid-template-columns: 1fr;
+    }
+    .panel-left {
+      display: none;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">
+      <div class="logo-mark"></div>
+      <h1>InteractomeViz<span>PPI & Pathway Explorer</span></h1>
+    </div>
+    <div class="header-stats">
+      <span>Nodes<span class="stat-val" id="stat-nodes">0</span></span>
+      <span>Edges<span class="stat-val" id="stat-edges">0</span></span>
+      <span>Pathways<span class="stat-val" id="stat-pathways">0</span></span>
+    </div>
+    <div class="header-controls">
+      <button class="btn" id="btn-labels" onclick="toggleLabels()">◈ Labels</button>
+      <button class="btn" id="btn-physics" onclick="togglePhysics()">⚡ Physics</button>
+      <button class="btn" onclick="resetView()">↻ Reset</button>
+    </div>
+  </header>
+
+  <div class="panel-left">
+    <div class="panel-section">
+      <div class="panel-section-title">Search Proteins</div>
+      <div class="search-box">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="search-input" placeholder="e.g. NRP1, VEGFA, TP53..." oninput="searchProtein(this.value)" />
+      </div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-section-title">Pathways</div>
+    </div>
+    <div class="pathway-list" id="pathway-list"></div>
+    <div class="panel-section" style="border-bottom:none;">
+      <div class="panel-section-title">Evidence Filter</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);cursor:pointer;">
+          <input type="checkbox" checked onchange="toggleEvidence('experimental')" style="accent-color:var(--accent-emerald);"> Experimental
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);cursor:pointer;">
+          <input type="checkbox" checked onchange="toggleEvidence('predicted')" style="accent-color:var(--accent-amber);"> Predicted
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);cursor:pointer;">
+          <input type="checkbox" checked onchange="toggleEvidence('literature')" style="accent-color:var(--accent-violet);"> Literature
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="canvas-area" id="canvas-area">
+    <div class="legend-bar">
+      <div class="legend-item"><div class="legend-line" style="background:var(--accent-emerald);"></div> Experimental</div>
+      <div class="legend-item"><div class="legend-line" style="background:var(--accent-amber);"></div> Predicted</div>
+      <div class="legend-item"><div class="legend-line" style="background:var(--accent-violet);"></div> Literature</div>
+    </div>
+    <div class="canvas-controls">
+      <button class="btn" onclick="zoomIn()">＋</button>
+      <button class="btn" onclick="zoomOut()">－</button>
+      <button class="btn" onclick="centerGraph()">◎</button>
+    </div>
+    <div class="tooltip" id="tooltip"></div>
+  </div>
+
+  <div class="panel-right" id="panel-right">
+    <div class="detail-empty" id="detail-empty">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.3"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      Click a protein node to explore its interactions and pathway membership.
+    </div>
+    <div class="detail-content" id="detail-content" style="display:none;"></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// DATA GENERATION — Realistic PPI network with cancer-relevant pathways
+// ══════════════════════════════════════════════════════════════════
+
+const PATHWAYS = [
+  { id: 'vegf', name: 'VEGF Signaling', color: '#3b82f6' },
+  { id: 'nrp1', name: 'NRP1/Semaphorin Axis', color: '#06b6d4' },
+  { id: 'tgfb', name: 'TGF-β / CAF Activation', color: '#10b981' },
+  { id: 'wnt', name: 'Wnt / β-catenin', color: '#f59e0b' },
+  { id: 'pi3k', name: 'PI3K/AKT/mTOR', color: '#f43f5e' },
+  { id: 'mapk', name: 'RAS/MAPK', color: '#f97316' },
+  { id: 'p53', name: 'p53 / DNA Damage', color: '#8b5cf6' },
+  { id: 'ecm', name: 'ECM Remodeling', color: '#ec4899' },
+  { id: 'jak', name: 'JAK/STAT', color: '#14b8a6' },
+  { id: 'notch', name: 'Notch Signaling', color: '#a855f7' },
+  { id: 'hh', name: 'Hedgehog', color: '#84cc16' },
+  { id: 'apop', name: 'Apoptosis', color: '#ef4444' },
+];
+
+const PATHWAY_MAP = {};
+PATHWAYS.forEach(p => PATHWAY_MAP[p.id] = p);
+
+// Protein data with real-ish annotations
+const PROTEINS_DATA = [
+  // VEGF Signaling
+  { id: 'VEGFA', name: 'Vascular Endothelial Growth Factor A', pathways: ['vegf','nrp1'], type: 'Ligand' },
+  { id: 'VEGFB', name: 'Vascular Endothelial Growth Factor B', pathways: ['vegf'], type: 'Ligand' },
+  { id: 'VEGFC', name: 'Vascular Endothelial Growth Factor C', pathways: ['vegf'], type: 'Ligand' },
+  { id: 'KDR', name: 'VEGFR2 / Kinase Insert Domain Receptor', pathways: ['vegf','pi3k'], type: 'Receptor TK' },
+  { id: 'FLT1', name: 'VEGFR1 / Fms-like Tyrosine Kinase 1', pathways: ['vegf'], type: 'Receptor TK' },
+  { id: 'FLT4', name: 'VEGFR3', pathways: ['vegf'], type: 'Receptor TK' },
+  // NRP1 axis
+  { id: 'NRP1', name: 'Neuropilin-1', pathways: ['nrp1','vegf','tgfb'], type: 'Co-receptor' },
+  { id: 'NRP2', name: 'Neuropilin-2', pathways: ['nrp1','vegf'], type: 'Co-receptor' },
+  { id: 'SEMA3A', name: 'Semaphorin 3A', pathways: ['nrp1'], type: 'Ligand' },
+  { id: 'SEMA3F', name: 'Semaphorin 3F', pathways: ['nrp1'], type: 'Ligand' },
+  { id: 'PLXNA1', name: 'Plexin A1', pathways: ['nrp1'], type: 'Receptor' },
+  { id: 'PLXNA2', name: 'Plexin A2', pathways: ['nrp1'], type: 'Receptor' },
+  { id: 'XYLT1', name: 'Xylosyltransferase 1', pathways: ['nrp1','ecm'], type: 'Enzyme' },
+  { id: 'XYLT2', name: 'Xylosyltransferase 2', pathways: ['ecm'], type: 'Enzyme' },
+  // TGF-β / CAF
+  { id: 'TGFB1', name: 'Transforming Growth Factor β1', pathways: ['tgfb','ecm'], type: 'Ligand' },
+  { id: 'TGFB2', name: 'Transforming Growth Factor β2', pathways: ['tgfb'], type: 'Ligand' },
+  { id: 'TGFBR1', name: 'TGF-β Receptor Type I', pathways: ['tgfb'], type: 'Receptor SK' },
+  { id: 'TGFBR2', name: 'TGF-β Receptor Type II', pathways: ['tgfb'], type: 'Receptor SK' },
+  { id: 'SMAD2', name: 'SMAD Family Member 2', pathways: ['tgfb'], type: 'Transcription Factor' },
+  { id: 'SMAD3', name: 'SMAD Family Member 3', pathways: ['tgfb'], type: 'Transcription Factor' },
+  { id: 'SMAD4', name: 'SMAD Family Member 4', pathways: ['tgfb','wnt'], type: 'Transcription Factor' },
+  { id: 'ACTA2', name: 'α-Smooth Muscle Actin (αSMA)', pathways: ['tgfb','ecm'], type: 'Structural' },
+  { id: 'FAP', name: 'Fibroblast Activation Protein', pathways: ['tgfb','ecm'], type: 'Protease' },
+  // Wnt
+  { id: 'WNT3A', name: 'Wnt Family Member 3A', pathways: ['wnt'], type: 'Ligand' },
+  { id: 'WNT5A', name: 'Wnt Family Member 5A', pathways: ['wnt'], type: 'Ligand' },
+  { id: 'FZD1', name: 'Frizzled-1', pathways: ['wnt'], type: 'Receptor' },
+  { id: 'LRP6', name: 'LDL Receptor Related Protein 6', pathways: ['wnt'], type: 'Co-receptor' },
+  { id: 'CTNNB1', name: 'β-Catenin', pathways: ['wnt'], type: 'Signaling' },
+  { id: 'APC', name: 'Adenomatous Polyposis Coli', pathways: ['wnt','p53'], type: 'Tumor Suppressor' },
+  { id: 'AXIN1', name: 'Axin 1', pathways: ['wnt'], type: 'Scaffold' },
+  { id: 'GSK3B', name: 'Glycogen Synthase Kinase 3β', pathways: ['wnt','pi3k'], type: 'Kinase' },
+  // PI3K/AKT/mTOR
+  { id: 'PIK3CA', name: 'PI3K Catalytic Subunit α', pathways: ['pi3k','vegf'], type: 'Kinase' },
+  { id: 'PIK3R1', name: 'PI3K Regulatory Subunit 1', pathways: ['pi3k'], type: 'Regulatory' },
+  { id: 'AKT1', name: 'AKT Serine/Threonine Kinase 1', pathways: ['pi3k','apop'], type: 'Kinase' },
+  { id: 'MTOR', name: 'Mechanistic Target of Rapamycin', pathways: ['pi3k'], type: 'Kinase' },
+  { id: 'PTEN', name: 'Phosphatase and Tensin Homolog', pathways: ['pi3k','p53'], type: 'Tumor Suppressor' },
+  { id: 'TSC1', name: 'Tuberous Sclerosis Complex 1', pathways: ['pi3k'], type: 'Tumor Suppressor' },
+  { id: 'TSC2', name: 'Tuberous Sclerosis Complex 2', pathways: ['pi3k'], type: 'Tumor Suppressor' },
+  { id: 'RPTOR', name: 'Raptor (mTORC1)', pathways: ['pi3k'], type: 'Scaffold' },
+  // RAS/MAPK
+  { id: 'KRAS', name: 'KRAS Proto-Oncogene', pathways: ['mapk','pi3k'], type: 'GTPase' },
+  { id: 'HRAS', name: 'HRAS Proto-Oncogene', pathways: ['mapk'], type: 'GTPase' },
+  { id: 'BRAF', name: 'B-Raf Proto-Oncogene', pathways: ['mapk'], type: 'Kinase' },
+  { id: 'RAF1', name: 'C-Raf Proto-Oncogene', pathways: ['mapk'], type: 'Kinase' },
+  { id: 'MAP2K1', name: 'MEK1', pathways: ['mapk'], type: 'Kinase' },
+  { id: 'MAPK1', name: 'ERK2', pathways: ['mapk'], type: 'Kinase' },
+  { id: 'MAPK3', name: 'ERK1', pathways: ['mapk'], type: 'Kinase' },
+  { id: 'SOS1', name: 'Son of Sevenless 1', pathways: ['mapk'], type: 'GEF' },
+  { id: 'GRB2', name: 'Growth Factor Receptor Bound 2', pathways: ['mapk','vegf'], type: 'Adaptor' },
+  // p53
+  { id: 'TP53', name: 'Tumor Protein p53', pathways: ['p53','apop'], type: 'Tumor Suppressor' },
+  { id: 'MDM2', name: 'Mouse Double Minute 2', pathways: ['p53'], type: 'E3 Ligase' },
+  { id: 'CDKN2A', name: 'p16/p14ARF', pathways: ['p53'], type: 'CDK Inhibitor' },
+  { id: 'CDKN1A', name: 'p21 / Cyclin-Dependent Kinase Inhibitor 1A', pathways: ['p53'], type: 'CDK Inhibitor' },
+  { id: 'ATM', name: 'Ataxia Telangiectasia Mutated', pathways: ['p53'], type: 'Kinase' },
+  { id: 'CHEK2', name: 'Checkpoint Kinase 2', pathways: ['p53'], type: 'Kinase' },
+  { id: 'RB1', name: 'Retinoblastoma Protein', pathways: ['p53'], type: 'Tumor Suppressor' },
+  // ECM
+  { id: 'MMP2', name: 'Matrix Metalloproteinase 2', pathways: ['ecm'], type: 'Protease' },
+  { id: 'MMP9', name: 'Matrix Metalloproteinase 9', pathways: ['ecm'], type: 'Protease' },
+  { id: 'MMP14', name: 'MT1-MMP', pathways: ['ecm'], type: 'Protease' },
+  { id: 'TIMP1', name: 'TIMP Metallopeptidase Inhibitor 1', pathways: ['ecm'], type: 'Inhibitor' },
+  { id: 'FN1', name: 'Fibronectin 1', pathways: ['ecm','tgfb'], type: 'ECM Protein' },
+  { id: 'COL1A1', name: 'Collagen Type I Alpha 1', pathways: ['ecm'], type: 'ECM Protein' },
+  { id: 'LOX', name: 'Lysyl Oxidase', pathways: ['ecm'], type: 'Enzyme' },
+  { id: 'ITGB1', name: 'Integrin β1', pathways: ['ecm','pi3k'], type: 'Receptor' },
+  // JAK/STAT
+  { id: 'JAK1', name: 'Janus Kinase 1', pathways: ['jak'], type: 'Kinase' },
+  { id: 'JAK2', name: 'Janus Kinase 2', pathways: ['jak'], type: 'Kinase' },
+  { id: 'STAT3', name: 'Signal Transducer and Activator of Transcription 3', pathways: ['jak','pi3k'], type: 'Transcription Factor' },
+  { id: 'STAT1', name: 'Signal Transducer and Activator of Transcription 1', pathways: ['jak'], type: 'Transcription Factor' },
+  { id: 'IL6', name: 'Interleukin 6', pathways: ['jak','tgfb'], type: 'Cytokine' },
+  { id: 'IL6R', name: 'Interleukin 6 Receptor', pathways: ['jak'], type: 'Receptor' },
+  { id: 'SOCS1', name: 'Suppressor of Cytokine Signaling 1', pathways: ['jak'], type: 'Inhibitor' },
+  // Notch
+  { id: 'NOTCH1', name: 'Notch Receptor 1', pathways: ['notch'], type: 'Receptor' },
+  { id: 'NOTCH2', name: 'Notch Receptor 2', pathways: ['notch'], type: 'Receptor' },
+  { id: 'DLL4', name: 'Delta-Like Ligand 4', pathways: ['notch','vegf'], type: 'Ligand' },
+  { id: 'JAG1', name: 'Jagged 1', pathways: ['notch'], type: 'Ligand' },
+  { id: 'HES1', name: 'Hes Family bHLH Transcription Factor 1', pathways: ['notch'], type: 'Transcription Factor' },
+  { id: 'RBPJ', name: 'Recombination Signal Binding Protein for Ig κ J', pathways: ['notch'], type: 'Transcription Factor' },
+  // Hedgehog
+  { id: 'SHH', name: 'Sonic Hedgehog', pathways: ['hh'], type: 'Ligand' },
+  { id: 'PTCH1', name: 'Patched 1', pathways: ['hh'], type: 'Receptor' },
+  { id: 'SMO', name: 'Smoothened', pathways: ['hh'], type: 'Receptor' },
+  { id: 'GLI1', name: 'GLI Family Zinc Finger 1', pathways: ['hh'], type: 'Transcription Factor' },
+  { id: 'GLI2', name: 'GLI Family Zinc Finger 2', pathways: ['hh'], type: 'Transcription Factor' },
+  // Apoptosis
+  { id: 'BCL2', name: 'B-Cell Lymphoma 2', pathways: ['apop'], type: 'Anti-apoptotic' },
+  { id: 'BAX', name: 'BCL2-Associated X', pathways: ['apop'], type: 'Pro-apoptotic' },
+  { id: 'CASP3', name: 'Caspase 3', pathways: ['apop'], type: 'Protease' },
+  { id: 'CASP9', name: 'Caspase 9', pathways: ['apop'], type: 'Protease' },
+  { id: 'CYCS', name: 'Cytochrome c', pathways: ['apop'], type: 'Electron Carrier' },
+  { id: 'BIRC5', name: 'Survivin', pathways: ['apop'], type: 'Anti-apoptotic' },
+  // Cross-linker hub nodes
+  { id: 'SRC', name: 'SRC Proto-Oncogene', pathways: ['vegf','mapk','pi3k'], type: 'Kinase' },
+  { id: 'EGFR', name: 'Epidermal Growth Factor Receptor', pathways: ['mapk','pi3k','jak'], type: 'Receptor TK' },
+  { id: 'MYC', name: 'MYC Proto-Oncogene', pathways: ['wnt','mapk','p53'], type: 'Transcription Factor' },
+  { id: 'HIF1A', name: 'Hypoxia Inducible Factor 1α', pathways: ['vegf','pi3k','notch'], type: 'Transcription Factor' },
+  { id: 'PDGFRA', name: 'PDGFRα', pathways: ['tgfb','mapk','pi3k'], type: 'Receptor TK' },
+  { id: 'PDGFB', name: 'PDGF-B', pathways: ['tgfb','ecm'], type: 'Ligand' },
+];
+
+const EVIDENCE_TYPES = ['experimental', 'predicted', 'literature'];
+const EVIDENCE_COLORS = {
+  experimental: '#10b981',
+  predicted: '#f59e0b',
+  literature: '#8b5cf6'
+};
+
+function generateEdges(proteins) {
+  const edges = [];
+  const proteinMap = {};
+  proteins.forEach(p => proteinMap[p.id] = p);
+
+  // Within-pathway connections
+  const pathwayGroups = {};
+  proteins.forEach(p => {
+    p.pathways.forEach(pw => {
+      if (!pathwayGroups[pw]) pathwayGroups[pw] = [];
+      pathwayGroups[pw].push(p.id);
+    });
+  });
+
+  Object.entries(pathwayGroups).forEach(([pw, members]) => {
+    for (let i = 0; i < members.length; i++) {
+      for (let j = i + 1; j < members.length; j++) {
+        if (Math.random() < 0.45) {
+          const ev = EVIDENCE_TYPES[Math.floor(Math.random() * 3)];
+          const conf = 0.5 + Math.random() * 0.5;
+          edges.push({
+            source: members[i],
+            target: members[j],
+            evidence: ev,
+            confidence: conf,
+            pathway: pw
+          });
+        }
+      }
+    }
+  });
+
+  // Cross-pathway connections via shared nodes
+  proteins.forEach(p => {
+    if (p.pathways.length > 1) {
+      const neighbors = proteins.filter(q =>
+        q.id !== p.id && q.pathways.some(pw => p.pathways.includes(pw))
+      );
+      neighbors.slice(0, 3).forEach(n => {
+        if (!edges.find(e => (e.source === p.id && e.target === n.id) || (e.source === n.id && e.target === p.id))) {
+          edges.push({
+            source: p.id,
+            target: n.id,
+            evidence: EVIDENCE_TYPES[Math.floor(Math.random() * 3)],
+            confidence: 0.4 + Math.random() * 0.6,
+            pathway: p.pathways[0]
+          });
+        }
+      });
+    }
+  });
+
+  // Deduplicate
+  const seen = new Set();
+  return edges.filter(e => {
+    const key = [e.source, e.target].sort().join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+const nodes = PROTEINS_DATA.map(p => ({
+  ...p,
+  degree: 0
+}));
+
+const links = generateEdges(PROTEINS_DATA);
+
+// Count degrees
+links.forEach(l => {
+  const s = nodes.find(n => n.id === l.source);
+  const t = nodes.find(n => n.id === l.target);
+  if (s) s.degree++;
+  if (t) t.degree++;
+});
+
+// ══════════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════════
+
+let showLabels = false;
+let physicsActive = true;
+let activePathways = new Set();
+let activeEvidence = new Set(['experimental', 'predicted', 'literature']);
+let selectedNode = null;
+let simulation;
+
+// ══════════════════════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════════════════════
+
+// Stats
+document.getElementById('stat-nodes').textContent = nodes.length;
+document.getElementById('stat-edges').textContent = links.length;
+document.getElementById('stat-pathways').textContent = PATHWAYS.length;
+
+// Pathway list
+const pathwayListEl = document.getElementById('pathway-list');
+PATHWAYS.forEach(p => {
+  const count = nodes.filter(n => n.pathways.includes(p.id)).length;
+  const el = document.createElement('div');
+  el.className = 'pathway-item';
+  el.dataset.id = p.id;
+  el.innerHTML = `
+    <div class="pathway-dot" style="background:${p.color}"></div>
+    <div class="pathway-label">${p.name}</div>
+    <div class="pathway-count">${count}</div>
+  `;
+  el.addEventListener('click', () => togglePathway(p.id));
+  pathwayListEl.appendChild(el);
+});
+
+// SVG
+const canvasArea = document.getElementById('canvas-area');
+const width = canvasArea.clientWidth;
+const height = canvasArea.clientHeight;
+
+const svg = d3.select('#canvas-area')
+  .append('svg')
+  .attr('width', width)
+  .attr('height', height);
+
+// Defs
+const defs = svg.append('defs');
+
+// Glow filter
+const glowFilter = defs.append('filter')
+  .attr('id', 'glow')
+  .attr('x', '-50%').attr('y', '-50%')
+  .attr('width', '200%').attr('height', '200%');
+glowFilter.append('feGaussianBlur').attr('stdDeviation', '3').attr('result', 'blur');
+glowFilter.append('feMerge').selectAll('feMergeNode')
+  .data(['blur', 'SourceGraphic'])
+  .enter().append('feMergeNode')
+  .attr('in', d => d);
+
+// Zoom
+const g = svg.append('g');
+
+const zoom = d3.zoom()
+  .scaleExtent([0.2, 5])
+  .on('zoom', (event) => {
+    g.attr('transform', event.transform);
+  });
+
+svg.call(zoom);
+
+// Grid
+const gridG = g.append('g').attr('class', 'grid');
+for (let x = -2000; x <= 4000; x += 60) {
+  gridG.append('line')
+    .attr('class', 'grid-line')
+    .attr('x1', x).attr('y1', -2000).attr('x2', x).attr('y2', 4000);
+}
+for (let y = -2000; y <= 4000; y += 60) {
+  gridG.append('line')
+    .attr('class', 'grid-line')
+    .attr('x1', -2000).attr('y1', y).attr('x2', 4000).attr('y2', y);
+}
+
+// Links
+const linkG = g.append('g');
+const linkElements = linkG.selectAll('.link')
+  .data(links)
+  .enter().append('line')
+  .attr('class', 'link')
+  .attr('stroke', d => EVIDENCE_COLORS[d.evidence])
+  .attr('stroke-width', d => 0.5 + d.confidence * 1.5)
+  .attr('opacity', d => 0.15 + d.confidence * 0.25);
+
+// Nodes
+const nodeG = g.append('g');
+const nodeElements = nodeG.selectAll('.node')
+  .data(nodes)
+  .enter().append('g')
+  .attr('class', 'node')
+  .call(d3.drag()
+    .on('start', dragStart)
+    .on('drag', dragging)
+    .on('end', dragEnd));
+
+function nodeRadius(d) {
+  return 4 + Math.sqrt(d.degree) * 2;
+}
+
+function nodeColor(d) {
+  const primaryPw = d.pathways[0];
+  return PATHWAY_MAP[primaryPw]?.color || '#64748b';
+}
+
+nodeElements.append('circle')
+  .attr('class', 'node-ring')
+  .attr('r', d => nodeRadius(d) + 4)
+  .attr('stroke', d => nodeColor(d));
+
+nodeElements.append('circle')
+  .attr('class', 'node-circle')
+  .attr('r', d => nodeRadius(d))
+  .attr('fill', d => nodeColor(d))
+  .attr('stroke', d => d3.color(nodeColor(d)).brighter(0.5));
+
+nodeElements.append('text')
+  .attr('class', 'node-label')
+  .attr('dy', d => -(nodeRadius(d) + 6))
+  .text(d => d.id);
+
+// Events
+nodeElements
+  .on('mouseover', (event, d) => showTooltip(event, d))
+  .on('mouseout', hideTooltip)
+  .on('click', (event, d) => selectNode(d));
+
+svg.on('click', (event) => {
+  if (event.target === svg.node() || event.target.tagName === 'line') {
+    deselectNode();
+  }
+});
+
+// Simulation
+simulation = d3.forceSimulation(nodes)
+  .force('link', d3.forceLink(links).id(d => d.id).distance(60).strength(0.3))
+  .force('charge', d3.forceManyBody().strength(-120).distanceMax(400))
+  .force('center', d3.forceCenter(width / 2, height / 2))
+  .force('collision', d3.forceCollide().radius(d => nodeRadius(d) + 3))
+  .force('x', d3.forceX(width / 2).strength(0.03))
+  .force('y', d3.forceY(height / 2).strength(0.03))
+  .on('tick', ticked);
+
+function ticked() {
+  linkElements
+    .attr('x1', d => d.source.x)
+    .attr('y1', d => d.source.y)
+    .attr('x2', d => d.target.x)
+    .attr('y2', d => d.target.y);
+
+  nodeElements.attr('transform', d => `translate(${d.x},${d.y})`);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// INTERACTIONS
+// ══════════════════════════════════════════════════════════════════
+
+function showTooltip(event, d) {
+  const tooltip = document.getElementById('tooltip');
+  const [mx, my] = d3.pointer(event, canvasArea);
+  tooltip.innerHTML = `
+    <div class="tooltip-name">${d.id}</div>
+    <div class="tooltip-type">${d.type} · ${d.degree} interactions</div>
+    <div class="tooltip-pathways">
+      ${d.pathways.map(pw => `<span class="tooltip-tag" style="background:${PATHWAY_MAP[pw].color}20;color:${PATHWAY_MAP[pw].color}">${PATHWAY_MAP[pw].name}</span>`).join('')}
+    </div>
+  `;
+  tooltip.style.left = (mx + 16) + 'px';
+  tooltip.style.top = (my - 10) + 'px';
+  tooltip.classList.add('visible');
+
+  // Highlight neighbors
+  const neighborIds = new Set();
+  neighborIds.add(d.id);
+  links.forEach(l => {
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    if (sid === d.id) neighborIds.add(tid);
+    if (tid === d.id) neighborIds.add(sid);
+  });
+
+  if (!selectedNode) {
+    nodeElements.classed('dimmed', n => !neighborIds.has(n.id));
+    nodeElements.classed('highlighted', n => neighborIds.has(n.id));
+    linkElements.classed('dimmed', l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      return !(sid === d.id || tid === d.id);
+    });
+    linkElements.classed('highlighted', l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      return (sid === d.id || tid === d.id);
+    });
+  }
+}
+
+function hideTooltip() {
+  document.getElementById('tooltip').classList.remove('visible');
+  if (!selectedNode) {
+    nodeElements.classed('dimmed', false).classed('highlighted', false);
+    linkElements.classed('dimmed', false).classed('highlighted', false);
+    applyFilters();
+  }
+}
+
+function selectNode(d) {
+  selectedNode = d;
+
+  // Highlight
+  const neighborIds = new Set();
+  neighborIds.add(d.id);
+  const nodeInteractions = [];
+
+  links.forEach(l => {
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    if (sid === d.id) { neighborIds.add(tid); nodeInteractions.push({ partner: tid, evidence: l.evidence, confidence: l.confidence }); }
+    if (tid === d.id) { neighborIds.add(sid); nodeInteractions.push({ partner: sid, evidence: l.evidence, confidence: l.confidence }); }
+  });
+
+  nodeElements.classed('dimmed', n => !neighborIds.has(n.id));
+  nodeElements.classed('highlighted', n => neighborIds.has(n.id));
+  linkElements.classed('dimmed', l => {
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    return !(sid === d.id || tid === d.id);
+  });
+  linkElements.classed('highlighted', l => {
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    return (sid === d.id || tid === d.id);
+  });
+
+  // Detail panel
+  document.getElementById('detail-empty').style.display = 'none';
+  const dc = document.getElementById('detail-content');
+  dc.style.display = 'block';
+
+  // Sort interactions by confidence
+  nodeInteractions.sort((a, b) => b.confidence - a.confidence);
+
+  dc.innerHTML = `
+    <div class="detail-header fade-in">
+      <div class="detail-protein-name" style="color:${nodeColor(d)}">${d.id}</div>
+      <div class="detail-full-name">${d.name}</div>
+    </div>
+    <div class="detail-meta fade-in">
+      <div class="meta-card">
+        <div class="meta-label">Degree</div>
+        <div class="meta-value">${d.degree}</div>
+      </div>
+      <div class="meta-card">
+        <div class="meta-label">Type</div>
+        <div class="meta-value" style="font-size:12px;color:var(--text-secondary);">${d.type}</div>
+      </div>
+    </div>
+    <div class="detail-section fade-in">
+      <div class="detail-section-title">Pathway Membership</div>
+      <div>
+        ${d.pathways.map(pw =>
+          `<span class="pathway-tag-detail" style="background:${PATHWAY_MAP[pw].color}18;color:${PATHWAY_MAP[pw].color};border:1px solid ${PATHWAY_MAP[pw].color}30;" onclick="togglePathway('${pw}')">${PATHWAY_MAP[pw].name}</span>`
+        ).join('')}
+      </div>
+    </div>
+    <div class="detail-section fade-in" style="border-bottom:none;">
+      <div class="detail-section-title">Interactions (${nodeInteractions.length})</div>
+      ${nodeInteractions.map(int => {
+        const partner = nodes.find(n => n.id === int.partner);
+        return `
+          <div class="interaction-item" onclick="focusOnNode('${int.partner}')">
+            <div class="interaction-dot" style="background:${partner ? nodeColor(partner) : '#64748b'}"></div>
+            <div class="interaction-name">${int.partner}</div>
+            <div class="interaction-evidence ${int.evidence === 'experimental' ? 'ev-experimental' : int.evidence === 'predicted' ? 'ev-predicted' : 'ev-literature'}">${int.evidence.slice(0,3).toUpperCase()} ${(int.confidence*100).toFixed(0)}%</div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+
+  event?.stopPropagation?.();
+}
+
+function deselectNode() {
+  selectedNode = null;
+  nodeElements.classed('dimmed', false).classed('highlighted', false);
+  linkElements.classed('dimmed', false).classed('highlighted', false);
+  document.getElementById('detail-empty').style.display = 'flex';
+  document.getElementById('detail-content').style.display = 'none';
+  applyFilters();
+}
+
+function focusOnNode(nodeId) {
+  const node = nodes.find(n => n.id === nodeId);
+  if (node) {
+    selectNode(node);
+    // Center on node
+    const transform = d3.zoomTransform(svg.node());
+    const newTransform = d3.zoomIdentity
+      .translate(width/2, height/2)
+      .scale(transform.k)
+      .translate(-node.x, -node.y);
+    svg.transition().duration(500).call(zoom.transform, newTransform);
+  }
+}
+
+// ── Pathway Toggle ──
+function togglePathway(id) {
+  if (activePathways.has(id)) {
+    activePathways.delete(id);
+  } else {
+    activePathways.add(id);
+  }
+
+  // Update UI
+  document.querySelectorAll('.pathway-item').forEach(el => {
+    el.classList.toggle('active', activePathways.has(el.dataset.id));
+  });
+
+  applyFilters();
+}
+
+function toggleEvidence(type) {
+  if (activeEvidence.has(type)) {
+    activeEvidence.delete(type);
+  } else {
+    activeEvidence.add(type);
+  }
+  applyFilters();
+}
+
+function applyFilters() {
+  if (selectedNode) return;
+
+  const hasPathwayFilter = activePathways.size > 0;
+
+  nodeElements.style('display', d => {
+    if (!hasPathwayFilter) return 'block';
+    return d.pathways.some(pw => activePathways.has(pw)) ? 'block' : 'none';
+  });
+
+  linkElements.style('display', l => {
+    if (!activeEvidence.has(l.evidence)) return 'none';
+    if (!hasPathwayFilter) return 'block';
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    const sNode = nodes.find(n => n.id === sid);
+    const tNode = nodes.find(n => n.id === tid);
+    if (!sNode || !tNode) return 'none';
+    const sMatch = sNode.pathways.some(pw => activePathways.has(pw));
+    const tMatch = tNode.pathways.some(pw => activePathways.has(pw));
+    return (sMatch && tMatch) ? 'block' : 'none';
+  });
+
+  // Highlight active pathway edges more
+  if (hasPathwayFilter) {
+    linkElements.attr('opacity', l => {
+      const pw = l.pathway;
+      return activePathways.has(pw) ? 0.3 + l.confidence * 0.4 : 0.08;
+    });
+  } else {
+    linkElements.attr('opacity', d => 0.15 + d.confidence * 0.25);
+  }
+}
+
+// ── Controls ──
+function toggleLabels() {
+  showLabels = !showLabels;
+  document.getElementById('btn-labels').classList.toggle('active', showLabels);
+  d3.selectAll('.node-label').classed('visible', showLabels);
+}
+
+function togglePhysics() {
+  physicsActive = !physicsActive;
+  document.getElementById('btn-physics').classList.toggle('active', physicsActive);
+  if (physicsActive) {
+    simulation.alpha(0.3).restart();
+  } else {
+    simulation.stop();
+  }
+}
+
+function resetView() {
+  activePathways.clear();
+  activeEvidence = new Set(['experimental', 'predicted', 'literature']);
+  document.querySelectorAll('.pathway-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.panel-section input[type=checkbox]').forEach(el => el.checked = true);
+  deselectNode();
+  centerGraph();
+}
+
+function zoomIn() {
+  svg.transition().duration(300).call(zoom.scaleBy, 1.4);
+}
+
+function zoomOut() {
+  svg.transition().duration(300).call(zoom.scaleBy, 0.7);
+}
+
+function centerGraph() {
+  svg.transition().duration(500).call(
+    zoom.transform,
+    d3.zoomIdentity.translate(0, 0).scale(1)
+  );
+}
+
+// ── Search ──
+function searchProtein(query) {
+  if (!query.trim()) {
+    nodeElements.classed('dimmed', false).classed('highlighted', false);
+    linkElements.classed('dimmed', false).classed('highlighted', false);
+    if (!selectedNode) applyFilters();
+    return;
+  }
+
+  const q = query.toUpperCase();
+  const matches = new Set();
+  nodes.forEach(n => {
+    if (n.id.toUpperCase().includes(q) || n.name.toUpperCase().includes(q)) {
+      matches.add(n.id);
+    }
+  });
+
+  if (matches.size === 0) {
+    nodeElements.classed('dimmed', true).classed('highlighted', false);
+    linkElements.classed('dimmed', true).classed('highlighted', false);
+    return;
+  }
+
+  nodeElements.classed('dimmed', n => !matches.has(n.id));
+  nodeElements.classed('highlighted', n => matches.has(n.id));
+  linkElements.classed('dimmed', l => {
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    return !(matches.has(sid) && matches.has(tid));
+  });
+
+  // If single match, focus
+  if (matches.size === 1) {
+    const nodeId = [...matches][0];
+    const node = nodes.find(n => n.id === nodeId);
+    if (node && node.x && node.y) {
+      const transform = d3.zoomTransform(svg.node());
+      const newTransform = d3.zoomIdentity
+        .translate(width/2, height/2)
+        .scale(Math.max(transform.k, 1.5))
+        .translate(-node.x, -node.y);
+      svg.transition().duration(500).call(zoom.transform, newTransform);
+    }
+  }
+}
+
+// ── Drag ──
+function dragStart(event, d) {
+  if (!event.active) simulation.alphaTarget(0.1).restart();
+  d.fx = d.x;
+  d.fy = d.y;
+}
+
+function dragging(event, d) {
+  d.fx = event.x;
+  d.fy = event.y;
+}
+
+function dragEnd(event, d) {
+  if (!event.active) simulation.alphaTarget(0);
+  if (physicsActive) {
+    d.fx = null;
+    d.fy = null;
+  }
+}
+
+// ── Resize ──
+window.addEventListener('resize', () => {
+  const w = canvasArea.clientWidth;
+  const h = canvasArea.clientHeight;
+  svg.attr('width', w).attr('height', h);
+  simulation.force('center', d3.forceCenter(w / 2, h / 2));
+  simulation.alpha(0.1).restart();
+});
+</script>
+</body>
+</html>
